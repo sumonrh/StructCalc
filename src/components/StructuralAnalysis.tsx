@@ -362,8 +362,10 @@ export function StructuralAnalysis() {
         if (load.nodeId) { const n = getNodeById(load.nodeId); if (!n) return null; x1=n.pos.x; y1=n.pos.y; x2=x1; y2=y1; } 
         else if (load.memberId) { const m = members.find(mi => mi.id === load.memberId); if (!m) return null; const sn=getNodeById(m.startNodeId), en=getNodeById(m.endNodeId); if(!sn||!en) return null; x1=sn.pos.x; y1=sn.pos.y; x2=en.pos.x; y2=en.pos.y; ang = Math.atan2(y2-y1, x2-x1); }
         else return null;
-        const lc = "#fb923c"; const sw = 1.5/zoom; const txS = { fontSize: `${10/zoom}px`, textAnchor: "middle" as const, paintOrder: "stroke" as const, stroke: "#020617", strokeWidth: `${3/zoom}px` };
+        const lc = "#fb923c"; const sw = 1.5/zoom; 
+        const txS = { fontSize: `${10/zoom}px`, textAnchor: "middle" as const, paintOrder: "stroke" as const, stroke: "#020617", strokeWidth: `${3/zoom}px` };
         const gP = { onClick: (e: MouseEvent) => handleLoadClick(load.id, e), className: cn(activeTool === 'delete' ? 'cursor-pointer group/load' : '') };
+        
         if (load.type === 'point') {
             let lx = x1+(x2-x1)*(load.position??0), ly = y1+(y2-y1)*(load.position??0);
             const dx = load.direction==='x'?Math.sign(load.magnitude):0, dy = load.direction==='x'?0:-Math.sign(load.magnitude);
@@ -560,15 +562,15 @@ export function StructuralAnalysis() {
                                 {members.map(m => {
                                     const s=getNodeById(m.startNodeId), e=getNodeById(m.endNodeId); if(!s||!e) return null;
                                     const el=<line key={m.id} x1={s.pos.x} y1={s.pos.y} x2={e.pos.x} y2={e.pos.y} stroke={activeTool==='delete'?"#ef4444":"#38bdf8"} strokeWidth={4/zoom} strokeLinecap="round" className="cursor-pointer transition-all hover:stroke-white" onClick={(ev)=>handleMemberClick(m.id, ev)} onContextMenu={(ev)=> { ev.preventDefault(); setEditingMemberId(m.id); }} />;
-                                    if(activeTool==='add-point-load') return <PointLoadPopover key={`mp-${m.id}`} targetId={m.id} isNode={false} onAddLoad={handleApplyPointLoad} toast={toast}>{el}</PointLoadPopover>;
-                                    if(activeTool==='add-udl') return <UDLPopover key={`mu-${m.id}`} targetId={m.id} onAddLoad={handleApplyUDL} toast={toast}>{el}</UDLPopover>;
+                                    if(activeTool==='add-point-load') return <PointLoadPopover key={`mp-${m.id}`} targetId={m.id} isNode={false} onAddLoad={handleApplyPointLoad}>{el}</PointLoadPopover>;
+                                    if(activeTool==='add-udl') return <UDLPopover key={`mu-${m.id}`} targetId={m.id} onAddLoad={handleApplyUDL}>{el}</UDLPopover>;
                                     return el;
                                 })}
                                 {previewLine && <line x1={previewLine.start.x} y1={previewLine.start.y} x2={previewLine.end.x} y2={previewLine.end.y} stroke="#38bdf8" strokeWidth={2/zoom} strokeDasharray={`${5/zoom} ${5/zoom}`} className="opacity-50 pointer-events-none" />}
                                 {nodes.map(n => {
                                     const el=<circle key={n.id} cx={n.pos.x} cy={n.pos.y} r={(drawingStartNode===n.id?8:6)/zoom} fill={drawingStartNode===n.id?"white":"#0ea5e9"} className="cursor-pointer transition-all hover:fill-white" onClick={(ev)=>handleNodeClick(n.id, ev)} />;
                                     if(activeTool==='add-support') return <DropdownMenu key={n.id}><DropdownMenuTrigger asChild>{el}</DropdownMenuTrigger><DropdownMenuContent className="bg-slate-900 border-slate-800 text-white"><DropdownMenuItem onClick={()=>handleAddSupport(n.id, 'pin')}>Pin</DropdownMenuItem><DropdownMenuItem onClick={()=>handleAddSupport(n.id, 'roller')}>Roller</DropdownMenuItem><DropdownMenuItem onClick={()=>handleAddSupport(n.id, 'fixed')}>Fixed</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
-                                    if(activeTool==='add-point-load') return <PointLoadPopover key={`np-${n.id}`} targetId={n.id} isNode={true} onAddLoad={handleApplyPointLoad} toast={toast}>{el}</PointLoadPopover>;
+                                    if(activeTool==='add-point-load') return <PointLoadPopover key={`np-${n.id}`} targetId={n.id} isNode={true} onAddLoad={handleApplyPointLoad}>{el}</PointLoadPopover>;
                                     return el;
                                 })}
                                 {supports.map(s => renderSupport(s))}

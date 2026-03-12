@@ -145,7 +145,7 @@ export function SteelGirder() {
         }
         if (bAH > bAT && bAT > 0) {
             rects.push(Utils.rectProps(-webT/2 - bAH, -webT/2 - bAT, yB, yB + bAT, 'BL Angle Horiz'));
-            rects.push(Utils.rectProps(webT/2 + tAT, webT/2 + bAH, yB, yB + bAT, 'BR Angle Horiz'));
+            rects.push(Utils.rectProps(webT/2 + bAT, webT/2 + bAH, yB, yB + bAT, 'BR Angle Horiz'));
         }
       }
     } else {
@@ -528,7 +528,7 @@ function GirderSVG({ results, printMode = false }: any) {
         <rect key={i} x={r.x1} y={totalDepth - r.y2} width={Math.max(0.1, r.b)} height={Math.max(0.1, r.h)} fill={r.label.includes('Angle') ? (printMode ? '#cbd5e1' : '#334155') : mainFill} stroke={mainStroke} strokeWidth={printMode ? "3.5" : "1.5"} />
       ))}
       <line x1={minX} y1={totalDepth - yBar} x2={maxX} y2={totalDepth - yBar} stroke={naColor} strokeWidth="5" strokeDasharray="20,10" />
-      <text x={maxX - 140} y={totalDepth - yBar - 20} fill={naColor} fontSize="52" font-weight="900">N.A.</text>
+      <text x={maxX - 140} y={totalDepth - yBar - 20} fill={naColor} fontSize="52" fontWeight="900">N.A.</text>
     </svg>
   );
 }
