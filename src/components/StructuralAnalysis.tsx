@@ -6,15 +6,15 @@ import { Separator } from "@/components/ui/separator";
 import { 
     Redo, Pointer, CircleDot, Trash2, Undo, ZoomIn, ZoomOut, Move, 
     RotateCcw, Paintbrush, TrendingUp, ArrowDownToLine, 
-    MoveHorizontal, Plus, Keyboard
+    MoveHorizontal, Plus, Keyboard, Info, Settings2
 } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { type AnalysisResult, analyzeStructure } from '@/lib/fea';
 
 // --- Type Definitions ---
@@ -68,8 +68,8 @@ const SupportIcon = () => (
 
 const MemberDrawIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="4" cy="20" r="2" />
-        <circle cx="20" cy="4" r="2" />
+        <circle cx="4" cy="20" r="2" fill="currentColor" />
+        <circle cx="20" cy="4" r="2" fill="currentColor" />
         <line x1="5.5" y1="18.5" x2="18.5" y2="5.5" />
     </svg>
 );
@@ -125,7 +125,7 @@ export function StructuralAnalysis() {
     const [cursorPos, setCursorPos] = useState<Point | null>(null);
     const [cursorWorldPos, setCursorWorldPos] = useState<{x: number, y: number} | null>(null);
     const [hoveredNode, setHoveredNode] = useState<number | null>(null);
-    const [tooltipInfo, setTooltipInfo] = useState<{ memberId?: number, value: number, unit: string, dx?: number, dy?: number, length?: number } | null>(null);
+    const [tooltipInfo, setTooltipInfo] = useState<{ value: number, unit: string, dx?: number, dy?: number, length?: number } | null>(null);
 
     const [activeMaterialId, setActiveMaterialId] = useState(materials[0].id);
     const [activeSectionId, setActiveSectionId] = useState(sections[0].id);
@@ -437,8 +437,6 @@ export function StructuralAnalysis() {
                     <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
                     
                     <Button variant={activeTool === 'add-support' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl", activeTool === 'add-support' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('add-support')} title="Add Support"><SupportIcon /></Button>
-                    <Button variant={activeTool === 'add-point-load' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl", activeTool === 'add-point-load' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('add-point-load')} title="Add Point Load"><ArrowDownToLine className="h-4 w-4" /></Button>
-                    <Button variant={activeTool === 'add-udl' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl", activeTool === 'add-udl' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('add-udl')} title="Add UDL"><UDLIcon /></Button>
                     
                     <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
                     
@@ -452,14 +450,19 @@ export function StructuralAnalysis() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                 <div className="lg:col-span-3 space-y-8 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
                     <div className="bg-slate-950/50 border border-slate-800 p-6 rounded-[2rem] space-y-6">
-                        <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest italic">Assignment Control</h4>
+                        <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest italic">Modeling Controls</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Button variant={activeTool === 'add-point-load' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('add-point-load')} className={cn("rounded-xl h-12 text-[9px] font-black uppercase tracking-wider", activeTool==='add-point-load'?'bg-sky-500 text-slate-950':'bg-slate-900 border-slate-800 text-white hover:bg-slate-800')}><ArrowDownToLine className="mr-2 h-3 w-3" /> Point Load</Button>
+                            <Button variant={activeTool === 'add-udl' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('add-udl')} className={cn("rounded-xl h-12 text-[9px] font-black uppercase tracking-wider", activeTool==='add-udl'?'bg-sky-500 text-slate-950':'bg-slate-900 border-slate-800 text-white hover:bg-slate-800')}><UDLIcon /> UDL</Button>
+                        </div>
+                        <div className="h-px bg-slate-800" />
                         <div className="space-y-4">
-                            <div className="space-y-1"><Label className="text-[9px] uppercase font-black text-slate-500">Material</Label>
-                                <Select value={activeMaterialId} onValueChange={setActiveMaterialId}><SelectTrigger className="h-9 bg-slate-900 border-slate-800 text-xs"><SelectValue /></SelectTrigger>
+                            <div className="space-y-1"><Label className="text-[9px] uppercase font-black text-slate-500">Active Material</Label>
+                                <Select value={activeMaterialId} onValueChange={setActiveMaterialId}><SelectTrigger className="h-9 bg-slate-900 border-slate-800 text-xs text-white"><SelectValue /></SelectTrigger>
                                 <SelectContent className="bg-slate-900 border-slate-800 text-white">{materials.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
                             </div>
-                            <div className="space-y-1"><Label className="text-[9px] uppercase font-black text-slate-500">Section</Label>
-                                <Select value={activeSectionId} onValueChange={setActiveSectionId}><SelectTrigger className="h-9 bg-slate-900 border-slate-800 text-xs"><SelectValue /></SelectTrigger>
+                            <div className="space-y-1"><Label className="text-[9px] uppercase font-black text-slate-500">Active Section</Label>
+                                <Select value={activeSectionId} onValueChange={setActiveSectionId}><SelectTrigger className="h-9 bg-slate-900 border-slate-800 text-xs text-white"><SelectValue /></SelectTrigger>
                                 <SelectContent className="bg-slate-900 border-slate-800 text-white">{sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
                             </div>
                             <Button variant={activeTool === 'assign' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('assign')} className="w-full h-9 rounded-xl font-black text-[10px] uppercase bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500 hover:text-slate-950"><Paintbrush className="mr-2 h-3 w-3" /> Bulk Assign</Button>
@@ -467,14 +470,17 @@ export function StructuralAnalysis() {
                     </div>
 
                     <div className="space-y-4">
-                        <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Project Materials</h4>
+                        <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">Materials</h4>
                         <div className="space-y-2">
                             {materials.map(m => (
                                 <div key={m.id} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center group hover:border-sky-500/30">
-                                    <div><p className="text-[10px] font-black text-white uppercase">{m.name}</p><p className="text-[9px] text-slate-500 font-bold">E: {m.E/1e9} GPa</p></div>
-                                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-slate-700 hover:text-sky-400"><Plus size={12} /></Button></PopoverTrigger>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-1 h-8 bg-sky-500 rounded-full" />
+                                        <div><p className="text-[10px] font-black text-white uppercase">{m.name}</p><p className="text-[9px] text-slate-500 font-bold">E: {m.E/1e9} GPa</p></div>
+                                    </div>
+                                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-slate-700 hover:text-sky-400"><Settings2 size={12} /></Button></PopoverTrigger>
                                         <PopoverContent className="bg-slate-900 border-slate-800 p-4"><Label className="text-[10px] uppercase font-bold text-slate-500 mb-2 block">Modulus E (GPa)</Label>
-                                        <Input type="number" value={m.E/1e9} onChange={e => handleUpdateMaterial(m.id, parseFloat(e.target.value)*1e9)} className="bg-slate-950 border-slate-800 text-xs h-8" /></PopoverContent></Popover>
+                                        <Input type="number" value={m.E/1e9} onChange={e => handleUpdateMaterial(m.id, parseFloat(e.target.value)*1e9)} className="bg-slate-950 border-slate-800 text-xs h-8 text-white" /></PopoverContent></Popover>
                                 </div>
                             ))}
                         </div>
@@ -482,34 +488,37 @@ export function StructuralAnalysis() {
 
                     <div className="space-y-4">
                         <div className="flex justify-between items-center px-2">
-                            <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Project Sections</h4>
+                            <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Sections</h4>
                             <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 text-sky-500"><Plus size={14} /></Button></PopoverTrigger>
                                 <PopoverContent className="w-72 bg-slate-900 border-slate-800 p-6 rounded-3xl text-white shadow-2xl">
                                     <h5 className="text-[10px] font-black uppercase mb-4 border-b border-slate-800 pb-2">New Section</h5>
                                     <div className="space-y-4">
-                                        <Input value={newSecName} onChange={e => setNewSecName(e.target.value)} placeholder="Name" className="h-8 bg-slate-950 border-slate-800 text-xs" />
-                                        <Select value={newSecType} onValueChange={(v:any) => setNewSecType(v)}><SelectTrigger className="h-8 bg-slate-950 border-slate-800 text-xs"><SelectValue /></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-slate-800"><SelectItem value="rect">Rectangular</SelectItem><SelectItem value="circ">Circular</SelectItem></SelectContent></Select>
+                                        <Input value={newSecName} onChange={e => setNewSecName(e.target.value)} placeholder="Name" className="h-8 bg-slate-950 border-slate-800 text-xs text-white" />
+                                        <Select value={newSecType} onValueChange={(v:any) => setNewSecType(v)}><SelectTrigger className="h-8 bg-slate-950 border-slate-800 text-xs text-white"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-slate-800 text-white"><SelectItem value="rect">Rectangular</SelectItem><SelectItem value="circ">Circular</SelectItem></SelectContent></Select>
                                         <div className="grid grid-cols-2 gap-4">
                                             {newSecType === 'rect' ? <>
-                                                <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">B (m)</Label><Input type="number" value={newSecB} onChange={e => setNewSecB(e.target.value)} className="h-8 bg-slate-950 border-slate-800 text-xs" /></div>
-                                                <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">H (m)</Label><Input type="number" value={newSecH} onChange={e => setNewSecH(e.target.value)} className="h-8 bg-slate-950 border-slate-800 text-xs" /></div>
-                                            </> : <div className="col-span-2 space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">D (m)</Label><Input type="number" value={newSecD} onChange={e => setNewSecD(e.target.value)} className="h-8 bg-slate-950 border-slate-800 text-xs" /></div>}
+                                                <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">B (m)</Label><Input type="number" value={newSecB} onChange={e => setNewSecB(e.target.value)} className="h-8 bg-slate-950 border-slate-800 text-xs text-white" /></div>
+                                                <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">H (m)</Label><Input type="number" value={newSecH} onChange={e => setNewSecH(e.target.value)} className="h-8 bg-slate-950 border-slate-800 text-xs text-white" /></div>
+                                            </> : <div className="col-span-2 space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">D (m)</Label><Input type="number" value={newSecD} onChange={e => setNewSecD(e.target.value)} className="h-8 bg-slate-950 border-slate-800 text-xs text-white" /></div>}
                                         </div>
-                                        <Button onClick={handleAddSection} className="w-full bg-sky-500 text-slate-950 font-black uppercase text-[10px]">Create</Button>
+                                        <Button onClick={handleAddSection} className="w-full bg-sky-500 text-slate-950 font-black uppercase text-[10px]">Create Section</Button>
                                     </div>
                                 </PopoverContent></Popover>
                         </div>
                         <div className="space-y-2">
                             {sections.map(s => (
                                 <div key={s.id} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center group hover:border-sky-500/30">
-                                    <div><p className="text-[10px] font-black text-white uppercase">{s.name}</p><p className="text-[9px] text-slate-500 font-bold">{s.type === 'rect' ? `${s.dims.b}x${s.dims.h}m` : `Ø${s.dims.d}m`}</p></div>
-                                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-slate-700 hover:text-sky-400"><Plus size={12} /></Button></PopoverTrigger>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-1 h-8 bg-emerald-500 rounded-full" />
+                                        <div><p className="text-[10px] font-black text-white uppercase">{s.name}</p><p className="text-[9px] text-slate-500 font-bold">{s.type === 'rect' ? `${s.dims.b}x${s.dims.h}m` : `Ø${s.dims.d}m`}</p></div>
+                                    </div>
+                                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-slate-700 hover:text-sky-400"><Settings2 size={12} /></Button></PopoverTrigger>
                                         <PopoverContent className="bg-slate-900 border-slate-800 p-4"><div className="space-y-3">
                                             {s.type === 'rect' ? <>
-                                                <div className="space-y-1"><Label className="text-[9px] font-bold text-slate-500">B (m)</Label><Input type="number" value={s.dims.b} onChange={e => handleUpdateSection(s.id, {...s.dims, b: e.target.value})} className="h-8 bg-slate-950 border-slate-800 text-xs" /></div>
-                                                <div className="space-y-1"><Label className="text-[9px] font-bold text-slate-500">H (m)</Label><Input type="number" value={s.dims.h} onChange={e => handleUpdateSection(s.id, {...s.dims, h: e.target.value})} className="h-8 bg-slate-950 border-slate-800 text-xs" /></div>
-                                            </> : <div className="space-y-1"><Label className="text-[9px] font-bold text-slate-500">D (m)</Label><Input type="number" value={s.dims.d} onChange={e => handleUpdateSection(s.id, {...s.dims, d: e.target.value})} className="h-8 bg-slate-950 border-slate-800 text-xs" /></div>}
+                                                <div className="space-y-1"><Label className="text-[9px] font-bold text-slate-500">B (m)</Label><Input type="number" value={s.dims.b} onChange={e => handleUpdateSection(s.id, {...s.dims, b: e.target.value})} className="h-8 bg-slate-950 border-slate-800 text-xs text-white" /></div>
+                                                <div className="space-y-1"><Label className="text-[9px] font-bold text-slate-500">H (m)</Label><Input type="number" value={s.dims.h} onChange={e => handleUpdateSection(s.id, {...s.dims, h: e.target.value})} className="h-8 bg-slate-950 border-slate-800 text-xs text-white" /></div>
+                                            </> : <div className="space-y-1"><Label className="text-[9px] font-bold text-slate-500">D (m)</Label><Input type="number" value={s.dims.d} onChange={e => handleUpdateSection(s.id, {...s.dims, d: e.target.value})} className="h-8 bg-slate-950 border-slate-800 text-xs text-white" /></div>}
                                         </div></PopoverContent></Popover>
                                 </div>
                             ))}
@@ -568,16 +577,19 @@ export function StructuralAnalysis() {
                 <PopoverContent className="w-72 bg-slate-900 border-slate-800 text-white rounded-3xl p-6 shadow-2xl z-50">
                     {editingMemberId && (
                         <div className="space-y-4">
-                            <div><h4 className="font-black text-xs uppercase italic">Member {editingMemberId} Properties</h4></div>
+                            <div className="flex items-center gap-3 border-b border-slate-800 pb-3 mb-2">
+                                <Info className="w-4 h-4 text-sky-500" />
+                                <h4 className="font-black text-xs uppercase italic">Member {editingMemberId} Properties</h4>
+                            </div>
                             <div className="space-y-2"><Label className="text-[10px] uppercase font-black text-slate-400">Material</Label>
                                 <Select value={members.find(m=>m.id===editingMemberId)?.materialId} onValueChange={(v)=>handleUpdateMemberProperties(editingMemberId, v, members.find(m=>m.id===editingMemberId)!.sectionId!)}>
-                                    <SelectTrigger className="bg-slate-950 border-slate-800 h-10"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">{materials.map(m=><SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
+                                    <SelectTrigger className="bg-slate-950 border-slate-800 h-10 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">{materials.map(m=><SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent></Select>
                             </div>
                             <div className="space-y-2"><Label className="text-[10px] uppercase font-black text-slate-400">Section</Label>
                                 <Select value={members.find(m=>m.id===editingMemberId)?.sectionId} onValueChange={(v)=>handleUpdateMemberProperties(editingMemberId, members.find(m=>m.id===editingMemberId)!.materialId!, v)}>
-                                    <SelectTrigger className="bg-slate-950 border-slate-800 h-10"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">{sections.map(s=><SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
+                                    <SelectTrigger className="bg-slate-950 border-slate-800 h-10 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">{sections.map(s=><SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
                             </div>
                         </div>
                     )}
@@ -638,16 +650,46 @@ function renderReactions(res: AnalysisResult, getNode: any, zoom: number) {
 function renderCursorTooltip(pos: Point|null, wPos: any, info: any, zoom: number, tool: Tool, startNode: number|null, diag: any) {
     if(!pos || !wPos) return null;
     const isDrawing = tool==='draw-member' && startNode!==null;
-    const h = (info || isDrawing ? 45 : 25)/zoom;
+    
+    const lines = [];
+    lines.push({ text: `X: ${wPos.x.toFixed(2)}m Y: ${wPos.y.toFixed(2)}m`, color: 'white', bold: true });
+    
+    // Only show analysis results if NOT in drafting mode to prevent overlap
+    if (info && !isDrawing) {
+        if (diag === 'deflection') {
+            lines.push({ text: `dx:${info.dx?.toFixed(2)} dy:${info.dy?.toFixed(2)}mm`, color: '#38bdf8', bold: true });
+        } else if (diag) {
+            lines.push({ text: `${diag==='shear'?'V':'M'}: ${info.value.toFixed(2)}${info.unit}`, color: '#38bdf8', bold: true });
+        }
+    }
+    
+    // Show length only during active drawing
+    if (isDrawing && info?.length) {
+        lines.push({ text: `Length: ${info.length.toFixed(2)}m`, color: '#fb923c', bold: true });
+    }
+    
+    if (isDrawing) {
+        lines.push({ text: `Right-Click to Exit`, color: '#fb923c', bold: true, small: true, upper: true });
+    }
+
+    const lineHeight = 16 / zoom;
+    const h = (lines.length * lineHeight + 10 / zoom);
+    
     return (
         <g transform={`translate(${pos.x + 15/zoom}, ${pos.y - 15/zoom})`} className="pointer-events-none select-none">
             <rect y={-20/zoom} width={140/zoom} height={h} rx={4/zoom} fill="rgba(2, 6, 23, 0.9)" stroke="#334155" strokeWidth={1/zoom} />
-            <text x={8/zoom} y={-6/zoom} fill="white" fontSize={`${10/zoom}px`} className="font-bold">X: {wPos.x.toFixed(2)}m Y: {wPos.y.toFixed(2)}m</text>
-            {info && <text x={8/zoom} y={14/zoom} fill="#38bdf8" fontSize={`${10/zoom}px`} className="font-black">
-                {diag==='deflection' ? `dx:${info.dx?.toFixed(2)} dy:${info.dy?.toFixed(2)}mm` : `${diag==='shear'?'V':'M'}: ${info.value.toFixed(2)}${info.unit}`}
-            </text>}
-            {isDrawing && info?.length && <text x={8/zoom} y={14/zoom} fill="#fb923c" fontSize={`${10/zoom}px`} className="font-black">Length: {info.length.toFixed(2)}m</text>}
-            {isDrawing && <text x={8/zoom} y={28/zoom} fill="#fb923c" fontSize={`${8/zoom}px`} className="font-black uppercase tracking-widest opacity-60">Right-Click to Exit</text>}
+            {lines.map((l, i) => (
+                <text 
+                    key={i} 
+                    x={8/zoom} 
+                    y={(-6/zoom) + (i * lineHeight)} 
+                    fill={l.color} 
+                    fontSize={`${(l.small ? 8 : 10)/zoom}px`} 
+                    className={cn(l.bold ? "font-bold" : "", l.upper ? "uppercase tracking-widest opacity-60" : "")}
+                >
+                    {l.text}
+                </text>
+            ))}
         </g>
     );
 }
@@ -690,11 +732,11 @@ const PointLoadPopover = ({ targetId, isNode, onAddLoad, children }: any) => {
             <PopoverContent className="w-64 bg-slate-900 border-slate-800 p-6 rounded-3xl text-white shadow-2xl space-y-4">
                 <h4 className="font-black uppercase text-xs italic">Apply Load</h4>
                 <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Direction</Label>
-                    <Select value={dir} onValueChange={(v:any)=>setDir(v)}><SelectTrigger className="bg-slate-950 border-slate-800 h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800"><SelectItem value="x">X Axis</SelectItem><SelectItem value="y">Y Axis</SelectItem></SelectContent></Select>
+                    <Select value={dir} onValueChange={(v:any)=>setDir(v)}><SelectTrigger className="bg-slate-950 border-slate-800 h-9 text-white"><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-800 text-white"><SelectItem value="x">X Axis</SelectItem><SelectItem value="y">Y Axis</SelectItem></SelectContent></Select>
                 </div>
-                <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Magnitude (kN)</Label><Input type="number" value={mag} onChange={e=>setMag(e.target.value)} className="bg-slate-950 border-slate-800 h-9" /></div>
-                {!isNode && <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Position (0-1)</Label><Input type="number" value={pos} onChange={e=>setPos(e.target.value)} step="0.1" className="bg-slate-950 border-slate-800 h-9" /></div>}
+                <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Magnitude (kN)</Label><Input type="number" value={mag} onChange={e=>setMag(e.target.value)} className="bg-slate-950 border-slate-800 h-9 text-white" /></div>
+                {!isNode && <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Position (0-1)</Label><Input type="number" value={pos} onChange={e=>setPos(e.target.value)} step="0.1" className="bg-slate-950 border-slate-800 h-9 text-white" /></div>}
                 <Button onClick={apply} className="w-full bg-sky-500 text-slate-950 font-black uppercase text-[10px]">Apply</Button>
             </PopoverContent>
         </Popover>
@@ -708,7 +750,7 @@ const UDLPopover = ({ targetId, onAddLoad, children }: any) => {
         <Popover><PopoverTrigger asChild>{children}</PopoverTrigger>
             <PopoverContent className="w-64 bg-slate-900 border-slate-800 p-6 rounded-3xl text-white shadow-2xl space-y-4">
                 <h4 className="font-black uppercase text-xs italic">Apply UDL</h4>
-                <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Magnitude (kN/m)</Label><Input type="number" value={mag} onChange={e=>setMag(e.target.value)} className="bg-slate-950 border-slate-800 h-9" /></div>
+                <div className="space-y-2"><Label className="text-[10px] uppercase font-bold text-slate-500">Magnitude (kN/m)</Label><Input type="number" value={mag} onChange={e=>setMag(e.target.value)} className="bg-slate-950 border-slate-800 h-9 text-white" /></div>
                 <Button onClick={apply} className="w-full bg-sky-500 text-slate-950 font-black uppercase text-[10px]">Apply</Button>
             </PopoverContent>
         </Popover>
