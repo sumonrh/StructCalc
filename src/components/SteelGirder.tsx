@@ -9,12 +9,12 @@ import { Settings, FileText, Download, LayoutPanelTop } from 'lucide-react';
 const Utils = {
   num: (v: any, name: string) => {
     const n = Number(v);
-    if (!Number.isFinite(n)) throw new Error(`Invalid numeric input for ${name}.`);
+    if (!Number.isFinite(n)) return 0;
     return n;
   },
   positive: (v: any, name: string, allowZero = false) => {
     const n = Utils.num(v, name);
-    if (allowZero ? n < 0 : n <= 0) throw new Error(`${name} must be ${allowZero ? '>= 0' : '> 0'}.`);
+    if (allowZero ? n < 0 : n <= 0) return 0;
     return n;
   },
   round: (v: number, d = 3) => {
@@ -31,7 +31,10 @@ const Utils = {
   rectProps: (x1: number, x2: number, y1: number, y2: number, label: string) => {
     const b = x2 - x1;
     const h = y2 - y1;
-    if (b <= 0 || h <= 0) throw new Error(`Non-positive dimensions for ${label}.`);
+    if (b <= 0 || h <= 0) {
+        // Return a dummy object if dimensions are invalid to prevent crash
+        return { label, x1, x2, y1, y2, b: 0, h: 0, area: 0, cx: 0, cy: 0, IxLocal: 0, IyLocal: 0 };
+    }
     return { 
       label, x1, x2, y1, y2, b, h, 
       area: b * h, 
@@ -92,7 +95,7 @@ export function SteelGirder() {
       const res = calculateAll(inputs, activeTab);
       setResults(res);
     } catch (e) {
-      console.error(e);
+      console.error("Calculation error in SteelGirder", e);
     }
   }, [inputs, activeTab]);
 
@@ -124,18 +127,26 @@ export function SteelGirder() {
       if (raw.topAnglesEnabled === "1") {
         const yT = tfBot + clearWebD;
         const tAH = Utils.num(raw.topAngleH, 'topAngleH'), tAV = Utils.num(raw.topAngleV, 'topAngleV'), tAT = Utils.num(raw.topAngleT, 'topAngleT');
-        rects.push(Utils.rectProps(-webT/2 - tAT, -webT/2, yT - tAV, yT, 'TL Angle Vert'));
-        rects.push(Utils.rectProps(webT/2, webT/2 + tAT, yT - tAV, yT, 'TR Angle Vert'));
-        rects.push(Utils.rectProps(-webT/2 - tAH, -webT/2 - tAT, yT - tAT, yT, 'TL Angle Horiz'));
-        rects.push(Utils.rectProps(webT/2 + tAT, webT/2 + tAH, yT - tAT, yT, 'TR Angle Horiz'));
+        if (tAV > tAT && tAT > 0) {
+            rects.push(Utils.rectProps(-webT/2 - tAT, -webT/2, yT - tAV, yT, 'TL Angle Vert'));
+            rects.push(Utils.rectProps(webT/2, webT/2 + tAT, yT - tAV, yT, 'TR Angle Vert'));
+        }
+        if (tAH > tAT && tAT > 0) {
+            rects.push(Utils.rectProps(-webT/2 - tAH, -webT/2 - tAT, yT - tAT, yT, 'TL Angle Horiz'));
+            rects.push(Utils.rectProps(webT/2 + tAT, webT/2 + tAH, yT - tAT, yT, 'TR Angle Horiz'));
+        }
       }
       if (raw.botAnglesEnabled === "1") {
         const yB = tfBot;
         const bAH = Utils.num(raw.botAngleH, 'botAngleH'), bAV = Utils.num(raw.botAngleV, 'botAngleV'), bAT = Utils.num(raw.botAngleT, 'botAngleT');
-        rects.push(Utils.rectProps(-webT/2 - bAT, -webT/2, yB, yB + bAV, 'BL Angle Vert'));
-        rects.push(Utils.rectProps(webT/2, webT/2 + bAT, yB, yB + bAV, 'BR Angle Vert'));
-        rects.push(Utils.rectProps(-webT/2 - bAH, -webT/2 - bAT, yB, yB + bAT, 'BL Angle Horiz'));
-        rects.push(Utils.rectProps(webT/2 + bAT, webT/2 + bAH, yB, yB + bAT, 'BR Angle Horiz'));
+        if (bAV > bAT && bAT > 0) {
+            rects.push(Utils.rectProps(-webT/2 - bAT, -webT/2, yB, yB + bAV, 'BL Angle Vert'));
+            rects.push(Utils.rectProps(webT/2, webT/2 + bAT, yB, yB + bAV, 'BR Angle Vert'));
+        }
+        if (bAH > bAT && bAT > 0) {
+            rects.push(Utils.rectProps(-webT/2 - bAH, -webT/2 - bAT, yB, yB + bAT, 'BL Angle Horiz'));
+            rects.push(Utils.rectProps(webT/2 + tAT, webT/2 + bAH, yB, yB + bAT, 'BR Angle Horiz'));
+        }
       }
     } else {
       const sWeb = Utils.positive(raw.boxWebSpacing, 'Web Spacing');
@@ -153,30 +164,35 @@ export function SteelGirder() {
       const xLWebOuter = -sWeb/2 - webT/2;
       const xRWebOuter = sWeb/2 + webT/2;
 
-      rects.push(Utils.rectProps(xLWebOuter - aT, xLWebOuter, yTopWeb - aV, yTopWeb, 'TL Angle Vert'));
-      rects.push(Utils.rectProps(xLWebOuter - aH, xLWebOuter - aT, yTopWeb - aT, yTopWeb, 'TL Angle Horiz'));
-      rects.push(Utils.rectProps(xRWebOuter, xRWebOuter + aT, yTopWeb - aV, yTopWeb, 'TR Angle Vert'));
-      rects.push(Utils.rectProps(xRWebOuter + aT, xRWebOuter + aH, yTopWeb - aT, yTopWeb, 'TR Angle Horiz'));
-      rects.push(Utils.rectProps(xLWebOuter - aT, xLWebOuter, yBotWeb, yBotWeb + aV, 'BL Angle Vert'));
-      rects.push(Utils.rectProps(xLWebOuter - aH, xLWebOuter - aT, yBotWeb, yBotWeb + aT, 'BL Angle Horiz'));
-      rects.push(Utils.rectProps(xRWebOuter, xRWebOuter + aT, yBotWeb, yBotWeb + aV, 'BR Angle Vert'));
-      rects.push(Utils.rectProps(xRWebOuter + aT, xRWebOuter + aH, yBotWeb, yBotWeb + aT, 'BR Angle Horiz'));
+      if (aV > aT && aT > 0) {
+          rects.push(Utils.rectProps(xLWebOuter - aT, xLWebOuter, yTopWeb - aV, yTopWeb, 'TL Angle Vert'));
+          rects.push(Utils.rectProps(xRWebOuter, xRWebOuter + aT, yTopWeb - aV, yTopWeb, 'TR Angle Vert'));
+          rects.push(Utils.rectProps(xLWebOuter - aT, xLWebOuter, yBotWeb, yBotWeb + aV, 'BL Angle Vert'));
+          rects.push(Utils.rectProps(xRWebOuter, xRWebOuter + aT, yBotWeb, yBotWeb + aV, 'BR Angle Vert'));
+      }
+      if (aH > aT && aT > 0) {
+          rects.push(Utils.rectProps(xLWebOuter - aH, xLWebOuter - aT, yTopWeb - aT, yTopWeb, 'TL Angle Horiz'));
+          rects.push(Utils.rectProps(xRWebOuter + aT, xRWebOuter + aH, yTopWeb - aT, yTopWeb, 'TR Angle Horiz'));
+          rects.push(Utils.rectProps(xLWebOuter - aH, xLWebOuter - aT, yBotWeb, yBotWeb + aT, 'BL Angle Horiz'));
+          rects.push(Utils.rectProps(xRWebOuter + aT, xRWebOuter + aH, yBotWeb, yBotWeb + aT, 'BR Angle Horiz'));
+      }
     }
 
-    const Area = rects.reduce((s, r) => s + r.area, 0);
-    const yBar = rects.reduce((s, r) => s + r.area * r.cy, 0) / Area;
-    const Ix = rects.reduce((s, r) => s + r.IxLocal + r.area * Math.pow(r.cy - yBar, 2), 0);
-    const Iy = rects.reduce((s, r) => s + r.IyLocal + r.area * Math.pow(r.cx, 2), 0);
-    const J = rects.reduce((s, r) => s + Utils.rectangleJ(r.b, r.h), 0);
+    const validRects = rects.filter(r => r.area > 0);
+    const Area = validRects.reduce((s, r) => s + r.area, 0);
+    const yBar = Area > 0 ? validRects.reduce((s, r) => s + r.area * r.cy, 0) / Area : totalDepth / 2;
+    const Ix = validRects.reduce((s, r) => s + r.IxLocal + r.area * Math.pow(r.cy - yBar, 2), 0);
+    const Iy = validRects.reduce((s, r) => s + r.IyLocal + r.area * Math.pow(r.cx, 2), 0);
+    const J = validRects.reduce((s, r) => s + Utils.rectangleJ(r.b, r.h), 0);
     const ho = clearWebD + (tfTop + tfBot)/2;
     const Cw = (Iy * Math.pow(ho, 2)) / 4;
-    const SxTop = Ix / (totalDepth - yBar);
-    const SxBot = Ix / yBar;
+    const SxTop = Ix / Math.max(1, (totalDepth - yBar));
+    const SxBot = Ix / Math.max(1, yBar);
     const SxMin = Math.min(SxTop, SxBot);
-    const maxX = rects.reduce((max, r) => Math.max(max, Math.abs(r.x1), Math.abs(r.x2)), 0);
-    const Sy = Iy / maxX;
+    const maxX = validRects.reduce((max, r) => Math.max(max, Math.abs(r.x1), Math.abs(r.x2)), 0);
+    const Sy = Iy / Math.max(1, maxX);
 
-    const Zx = rects.reduce((s, r) => {
+    const Zx = validRects.reduce((s, r) => {
       const y1 = r.y1 - yBar, y2 = r.y2 - yBar;
       if (y1 >= 0) return s + r.area * (r.cy - yBar);
       if (y2 <= 0) return s + r.area * (yBar - r.cy);
@@ -186,26 +202,26 @@ export function SteelGirder() {
 
     const Iyt = (tfTop * Math.pow(bfTop, 3)) / 12;
     const Iyb = (tfBot * Math.pow(bfBot, 3)) / 12;
-    const dSC_top = ho * (Iyb / (Iyt + Iyb));
+    const dSC_top = ho * (Iyb / Math.max(1, (Iyt + Iyb)));
     const yo = (tfBot + clearWebD + tfTop/2 - dSC_top) - yBar;
-    const integral = rects.reduce((s, r) => s + (r.area * (r.cy - yBar) * (Math.pow(r.cy - yBar, 2) + Math.pow(r.cx, 2) + r.h*r.h/12 + r.b*r.b/12)), 0);
-    const betaX = (integral / Ix) - (2 * yo);
-    const B1 = Math.PI * (betaX / (2 * L)) * Math.sqrt((Es * Iy) / (Gs * J));
-    const B2 = (Math.PI * Math.PI * Es * Cw) / (L * L * Gs * J);
-    const Mu = (omega2 * Math.PI / L) * Math.sqrt(Es * Iy * Gs * J) * (B1 + Math.sqrt(1 + B2 + B1*B1));
+    const integral = validRects.reduce((s, r) => s + (r.area * (r.cy - yBar) * (Math.pow(r.cy - yBar, 2) + Math.pow(r.cx, 2) + r.h*r.h/12 + r.b*r.b/12)), 0);
+    const betaX = (integral / Math.max(1, Ix)) - (2 * yo);
+    const B1 = Math.PI * (betaX / (2 * Math.max(1, L))) * Math.sqrt((Es * Iy) / Math.max(1, (Gs * J)));
+    const B2 = (Math.PI * Math.PI * Es * Cw) / (Math.max(1, L * L) * Math.max(1, Gs * J));
+    const Mu = (omega2 * Math.PI / Math.max(1, L)) * Math.sqrt(Es * Iy * Gs * J) * (B1 + Math.sqrt(Math.max(0, 1 + B2 + B1*B1)));
 
     const sqrtFy = Math.sqrt(fy);
     let slFlange, f1, f2, f3;
     if (type === 'i-girder') {
-      slFlange = ((bfTop - webT)/2 / tfTop);
+      slFlange = ((bfTop - webT)/2 / Math.max(1, tfTop));
       f1 = 145/sqrtFy; f2 = 170/sqrtFy; f3 = 200/sqrtFy;
     } else {
       const bClear = Utils.num(raw.boxWebSpacing, 'boxWebSpacing') - webT;
-      slFlange = bClear / tfTop;
+      slFlange = bClear / Math.max(1, tfTop);
       f1 = 420/sqrtFy; f2 = 525/sqrtFy; f3 = 670/sqrtFy;
     }
     
-    const slWeb = clearWebD / webT;
+    const slWeb = clearWebD / Math.max(1, webT);
     const w1 = 1100/sqrtFy, w2 = 1700/sqrtFy, w3 = 1900/sqrtFy;
     const fClass = slFlange <= f1 ? 1 : slFlange <= f2 ? 2 : slFlange <= f3 ? 3 : 4;
     const wClass = slWeb <= w1 ? 1 : slWeb <= w2 ? 2 : slWeb <= w3 ? 3 : 4;
@@ -223,20 +239,20 @@ export function SteelGirder() {
 
     const nWebs = type === 'i-girder' ? 1 : 2;
     const Aw = nWebs * clearWebD * webT;
-    const h_over_w = clearWebD / webT;
-    const a_over_h = stiffA / clearWebD;
-    let kv = a_over_h < 1 ? (4 + 5.34/Math.pow(a_over_h, 2)) : (5.34 + 4/Math.pow(a_over_h, 2));
+    const h_over_w = clearWebD / Math.max(1, webT);
+    const a_over_h = stiffA / Math.max(1, clearWebD);
+    let kv = a_over_h < 1 ? (4 + 5.34/Math.pow(Math.max(0.1, a_over_h), 2)) : (5.34 + 4/Math.pow(Math.max(0.1, a_over_h), 2));
     const limit1 = 502 * Math.sqrt(kv / fy), limit2 = 621 * Math.sqrt(kv / fy);
     let Fcr, Ft = 0;
     if (h_over_w <= limit1) Fcr = 0.577 * fy;
-    else if (h_over_w <= limit2) Fcr = (290 * Math.sqrt(kv * fy)) / h_over_w;
-    else Fcr = (180000 * kv) / Math.pow(h_over_w, 2);
+    else if (h_over_w <= limit2) Fcr = (290 * Math.sqrt(kv * fy)) / Math.max(1, h_over_w);
+    else Fcr = (180000 * kv) / Math.pow(Math.max(1, h_over_w), 2);
     if (h_over_w > limit1) Ft = (0.577 * fy - Fcr) / Math.sqrt(1 + Math.pow(a_over_h, 2));
     const Fs = Fcr + Ft; 
     const Vr = phiS * Aw * Fs;
 
     return {
-      raw, type, rects, Area, Ix, Iy, J, Cw, Zx, SxTop, SxBot, Sy, yBar, totalDepth, ho, betaX, yo, B1, B2, Mu, Mr, gClass,
+      raw, type, rects: validRects, Area, Ix, Iy, J, Cw, Zx, SxTop, SxBot, Sy, yBar, totalDepth, ho, betaX, yo, B1, B2, Mu, Mr, gClass,
       Aw, Fcr, Ft, Fs, Vr, kv, fy, L, h_over_w, stiffA, a_over_h, limit1, limit2, phiS, SxMin, My, Mp, Es, Gs, omega2,
       slFlange, slWeb, fClass, wClass, f1, f2, f3, w1, w2, w3, bfTop, clearWebD, webT
     };
@@ -509,10 +525,10 @@ function GirderSVG({ results, printMode = false }: any) {
   return (
     <svg viewBox={`${minX} -120 ${width} ${height}`} className={`w-full h-full ${printMode ? '' : 'drop-shadow-2xl'}`}>
       {rects.map((r: any, i: number) => (
-        <rect key={i} x={r.x1} y={totalDepth - r.y2} width={r.b} height={r.h} fill={r.label.includes('Angle') ? (printMode ? '#cbd5e1' : '#334155') : mainFill} stroke={mainStroke} strokeWidth={printMode ? "3.5" : "1.5"} />
+        <rect key={i} x={r.x1} y={totalDepth - r.y2} width={Math.max(0.1, r.b)} height={Math.max(0.1, r.h)} fill={r.label.includes('Angle') ? (printMode ? '#cbd5e1' : '#334155') : mainFill} stroke={mainStroke} strokeWidth={printMode ? "3.5" : "1.5"} />
       ))}
       <line x1={minX} y1={totalDepth - yBar} x2={maxX} y2={totalDepth - yBar} stroke={naColor} strokeWidth="5" strokeDasharray="20,10" />
-      <text x={maxX - 140} y={totalDepth - yBar - 20} fill={naColor} fontSize="52" fontWeight="black">N.A.</text>
+      <text x={maxX - 140} y={totalDepth - yBar - 20} fill={naColor} fontSize="52" font-weight="900">N.A.</text>
     </svg>
   );
 }

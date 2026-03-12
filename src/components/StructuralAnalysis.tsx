@@ -694,12 +694,12 @@ function renderCursorTooltip(pos: Point|null, wPos: any, info: any, zoom: number
         lines.push({ text: `Right-Click to Exit`, color: '#fb923c', bold: true, small: true, upper: true });
     }
 
-    const lineHeight = 16 / zoom;
-    const h = (lines.length * lineHeight + 10 / zoom);
+    const lineHeight = 18 / zoom;
+    const h = (lines.length * lineHeight + 12 / zoom);
     
     return (
         <g transform={`translate(${pos.x + 15/zoom}, ${pos.y - 15/zoom})`} className="pointer-events-none select-none">
-            <rect y={-20/zoom} width={140/zoom} height={h} rx={4/zoom} fill="rgba(2, 6, 23, 0.9)" stroke="#334155" strokeWidth={1/zoom} />
+            <rect y={-22/zoom} width={140/zoom} height={h} rx={4/zoom} fill="rgba(2, 6, 23, 0.9)" stroke="#334155" strokeWidth={1/zoom} />
             {lines.map((l, i) => (
                 <text 
                     key={i} 
