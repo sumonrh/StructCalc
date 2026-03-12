@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useRef, MouseEvent, useEffect } from 'react';
+import { useState, useRef, MouseEvent, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Redo, Pointer, CircleDot, Trash2, Undo, AlertCircle, ZoomIn, ZoomOut, Move, RotateCcw, Database, Box as BoxIcon, Paintbrush, TrendingUp, ArrowDownToLine, MoveHorizontal, Plus } from 'lucide-react';
+import { 
+    Redo, Pointer, CircleDot, Trash2, Undo, AlertCircle, ZoomIn, ZoomOut, Move, 
+    RotateCcw, Database, Box as BoxIcon, Paintbrush, TrendingUp, ArrowDownToLine, 
+    MoveHorizontal, Plus, Keyboard, Ruler
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
@@ -121,7 +125,7 @@ export function StructuralAnalysis() {
     const [cursorPos, setCursorPos] = useState<Point | null>(null);
     const [cursorWorldPos, setCursorWorldPos] = useState<{x: number, y: number} | null>(null);
     const [hoveredNode, setHoveredNode] = useState<number | null>(null);
-    const [tooltipInfo, setTooltipInfo] = useState<{ memberId: number, value: number, unit: string, dx?: number, dy?: number } | null>(null);
+    const [tooltipInfo, setTooltipInfo] = useState<{ memberId?: number, value: number, unit: string, dx?: number, dy?: number, length?: number } | null>(null);
 
     const [activeMaterialId, setActiveMaterialId] = useState(materials[0].id);
     const [activeSectionId, setActiveSectionId] = useState(sections[0].id);
@@ -129,11 +133,16 @@ export function StructuralAnalysis() {
     const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
     const propertyPopoverTriggerRef = useRef<HTMLButtonElement>(null);
 
+    // New Section State
     const [newSecName, setNewSecName] = useState('');
     const [newSecType, setNewSecType] = useState<'rect' | 'circ'>('rect');
     const [newSecB, setNewSecB] = useState('0.3');
     const [newSecH, setNewSecH] = useState('0.5');
     const [newSecD, setNewSecD] = useState('0.4');
+
+    // Manual Node State
+    const [manualX, setManualX] = useState('0.0');
+    const [manualY, setManualY] = useState('0.0');
 
     const svgRef = useRef<SVGSVGElement>(null);
 
@@ -334,13 +343,12 @@ export function StructuralAnalysis() {
             return;
         }
         let A = 0, I = 0, dims = {};
+        const b = parseFloat(newSecB) || 0, h = parseFloat(newSecH) || 0, d = parseFloat(newSecD) || 0;
         if (newSecType === 'rect') {
-            const b = parseFloat(newSecB), h = parseFloat(newSecH);
             A = b * h;
             I = (b * Math.pow(h, 3)) / 12;
             dims = { b, h };
         } else {
-            const d = parseFloat(newSecD);
             A = Math.PI * Math.pow(d / 2, 2);
             I = (Math.PI * Math.pow(d, 4)) / 64;
             dims = { d };
@@ -357,6 +365,17 @@ export function StructuralAnalysis() {
         }));
         setNewSecName('');
         toast({ title: "Section Created", description: `Added ${newSecName} to your section library.` });
+    };
+
+    const handleManualNode = () => {
+        const x = parseFloat(manualX) * PIXELS_PER_METER;
+        const y = -parseFloat(manualY) * PIXELS_PER_METER;
+        if (isNaN(x) || isNaN(y)) {
+            toast({ variant: 'destructive', title: "Invalid Coordinates", description: "Please enter valid numeric values." });
+            return;
+        }
+        setState(prev => ({ ...prev, nodes: [...prev.nodes, { id: getNextId(prev.nodes), pos: { x, y } }] }));
+        toast({ title: "Node Inserted", description: `Node placed at (${manualX}m, ${manualY}m)` });
     };
 
     const handleMouseMove = (e: MouseEvent<SVGSVGElement>) => {
@@ -378,9 +397,11 @@ export function StructuralAnalysis() {
 
         if (activeTool === 'draw-member' && drawingStartNode !== null && previewLine) {
             setPreviewLine({ ...previewLine, end: snap });
-        }
-
-        if (analysisResult) {
+            const dx = (snap.x - previewLine.start.x) / PIXELS_PER_METER;
+            const dy = (snap.y - previewLine.start.y) / PIXELS_PER_METER;
+            const length = Math.hypot(dx, dy);
+            setTooltipInfo({ value: 0, unit: 'm', length });
+        } else if (analysisResult) {
             let bestTooltip: any = null;
             let minDistance = 15 / zoom;
 
@@ -626,13 +647,16 @@ export function StructuralAnalysis() {
 
     const renderCursorTooltip = () => {
         if (!cursorPos) return null;
+        const isDrawing = activeTool === 'draw-member' && drawingStartNode !== null;
         const showCoord = ['draw-node', 'draw-member'].includes(activeTool);
         const showAnalysis = !!tooltipInfo;
         const showNode = hoveredNode !== null;
+        
         if (!showCoord && !showAnalysis && !showNode) return null;
+        
         return (
             <g transform={`translate(${cursorPos.x + 15/zoom}, ${cursorPos.y - 15/zoom})`} className="pointer-events-none select-none">
-                <rect x="0" y={showAnalysis ? -40/zoom : -20/zoom} width={140/zoom} height={(showAnalysis ? 45 : 25)/zoom} rx={4/zoom} fill="rgba(2, 6, 23, 0.9)" stroke="#334155" strokeWidth={1/zoom} />
+                <rect x="0" y={showAnalysis ? -40/zoom : -20/zoom} width={140/zoom} height={(showAnalysis || isDrawing ? 45 : 25)/zoom} rx={4/zoom} fill="rgba(2, 6, 23, 0.9)" stroke="#334155" strokeWidth={1/zoom} />
                 {(showCoord || showNode) && cursorWorldPos && (
                     <text x={8/zoom} y={-6/zoom} fill="white" fontSize={`${10/zoom}px`} className="font-bold">
                         {showNode ? `Node ${hoveredNode}: ` : 'Pos: '}{cursorWorldPos.x.toFixed(2)}, {cursorWorldPos.y.toFixed(2)}m
@@ -642,10 +666,12 @@ export function StructuralAnalysis() {
                     <text x={8/zoom} y={showCoord ? 14/zoom : -6/zoom} fill="#38bdf8" fontSize={`${10/zoom}px`} className="font-black">
                         {activeResultDiagram === 'deflection' 
                             ? `dx:${tooltipInfo.dx?.toFixed(2)} dy:${tooltipInfo.dy?.toFixed(2)}mm` 
-                            : `${activeResultDiagram === 'shear' ? 'V' : 'M'}: ${tooltipInfo.value.toFixed(2)} ${tooltipInfo.unit}`}
+                            : tooltipInfo.length 
+                                ? `Length: ${tooltipInfo.length.toFixed(2)} m`
+                                : `${activeResultDiagram === 'shear' ? 'V' : 'M'}: ${tooltipInfo.value.toFixed(2)} ${tooltipInfo.unit}`}
                     </text>
                 )}
-                {activeTool === 'draw-member' && drawingStartNode !== null && (
+                {isDrawing && (
                     <text x={8/zoom} y={28/zoom} fill="#fb923c" fontSize={`${8/zoom}px`} className="font-black uppercase tracking-widest">Right-Click to Cancel</text>
                 )}
             </g>
@@ -709,17 +735,18 @@ export function StructuralAnalysis() {
 
     return (
         <section className="bg-slate-900 border border-slate-800 rounded-[3rem] p-10 shadow-2xl space-y-10">
+            {/* Member Right-Click Popup */}
             <Popover open={editingMemberId !== null} onOpenChange={(open) => !open && setEditingMemberId(null)}>
                 <PopoverTrigger asChild><button ref={propertyPopoverTriggerRef} className="hidden" /></PopoverTrigger>
                 <PopoverContent className="w-72 bg-slate-900 border-slate-800 text-white rounded-3xl p-6 shadow-2xl z-50">
                     {currentEditingMember && (
                         <div className="space-y-4">
                             <div>
-                                <h4 className="font-black text-white uppercase text-xs tracking-widest italic">Member {currentEditingMember.id} Analysis Properties</h4>
-                                <p className="text-[9px] text-slate-500 uppercase font-bold mt-1">Assign library material/section.</p>
+                                <h4 className="font-black text-white uppercase text-xs tracking-widest italic">Member {currentEditingMember.id} Properties</h4>
+                                <p className="text-[9px] text-slate-500 uppercase font-bold mt-1">Select from project library.</p>
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] uppercase font-black text-slate-400">Structural Material</Label>
+                                <Label className="text-[10px] uppercase font-black text-slate-400">Material</Label>
                                 <Select value={currentEditingMember.materialId} onValueChange={(v) => handleUpdateMemberProperties(currentEditingMember.id, v, currentEditingMember.sectionId!)}>
                                     <SelectTrigger className="bg-slate-950 border-slate-800 rounded-xl h-10 text-white"><SelectValue /></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-white">
@@ -728,7 +755,7 @@ export function StructuralAnalysis() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] uppercase font-black text-slate-400">Cross Section</Label>
+                                <Label className="text-[10px] uppercase font-black text-slate-400">Section</Label>
                                 <Select value={currentEditingMember.sectionId} onValueChange={(v) => handleUpdateMemberProperties(currentEditingMember.id, currentEditingMember.materialId!, v)}>
                                     <SelectTrigger className="bg-slate-950 border-slate-800 rounded-xl h-10 text-white"><SelectValue /></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-800 text-white">
@@ -741,101 +768,177 @@ export function StructuralAnalysis() {
                 </PopoverContent>
             </Popover>
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div>
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic flex items-center gap-4">
-                        <span className="bg-sky-500 text-slate-950 px-3 py-1 rounded-xl text-sm font-black not-italic shadow-lg shadow-sky-500/20">FEA</span>
-                        2D Static Analysis
-                    </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Precision Modeling Engine.</p>
-                </div>
-                <div className="flex gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                    <Button variant={activeTool === 'select' ? 'secondary' : 'ghost'} size="icon" className={cn("transition-all", activeTool === 'select' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('select')} title="Select"><Pointer className="h-4 w-4" /></Button>
-                    <Button variant={activeTool === 'pan' ? 'secondary' : 'ghost'} size="icon" className={cn("transition-all", activeTool === 'pan' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('pan')} title="Pan"><Move className="h-4 w-4" /></Button>
-                    <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
-                    <Button variant="ghost" size="icon" className="text-white" onClick={() => setZoom(p => Math.min(p + 0.1, 5))}><ZoomIn className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="text-white" onClick={() => setZoom(p => Math.max(p - 0.1, 0.2))}><ZoomOut className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="text-white" onClick={() => { setZoom(1); setPan({x:0,y:0}); }}><RotateCcw className="h-4 w-4" /></Button>
-                    <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
-                    <Button variant="ghost" size="icon" className="text-white" onClick={undo} disabled={historyIndex === 0}><Undo className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="text-white" onClick={redo} disabled={historyIndex === history.length-1}><Redo className="h-4 w-4" /></Button>
+            {/* Header & Main Toolbar */}
+            <div className="flex flex-col gap-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic flex items-center gap-4">
+                            <span className="bg-sky-500 text-slate-950 px-3 py-1 rounded-xl text-sm font-black not-italic shadow-lg shadow-sky-500/20">FEA</span>
+                            2D Static Analysis
+                        </h2>
+                    </div>
+                    <div className="flex gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 shadow-xl flex-wrap">
+                        {/* Drawing & Edit Tools Icons */}
+                        <Button variant={activeTool === 'select' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'select' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('select')} title="Select"><Pointer className="h-4 w-4" /></Button>
+                        <Button variant={activeTool === 'pan' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'pan' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('pan')} title="Pan"><Move className="h-4 w-4" /></Button>
+                        <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
+                        
+                        <Button variant={activeTool === 'draw-member' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'draw-member' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('draw-member')} title="Draw Member"><MemberDrawIcon /></Button>
+                        <Button variant={activeTool === 'draw-node' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'draw-node' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('draw-node')} title="Draw Node"><CircleDot className="h-4 w-4" /></Button>
+                        
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="rounded-xl text-white hover:text-sky-400" title="Manual Node Input"><Keyboard className="h-4 w-4" /></Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 bg-slate-900 border-slate-800 text-white rounded-3xl p-6 shadow-2xl">
+                                <h4 className="font-black uppercase text-xs tracking-widest mb-4 border-b border-slate-800 pb-2">Insert Node</h4>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-slate-500">X (m)</Label><Input type="number" value={manualX} onChange={e => setManualX(e.target.value)} className="bg-slate-950 border-slate-800" /></div>
+                                        <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-slate-500">Y (m)</Label><Input type="number" value={manualY} onChange={e => setManualY(e.target.value)} className="bg-slate-950 border-slate-800" /></div>
+                                    </div>
+                                    <Button onClick={handleManualNode} className="w-full bg-sky-500 text-slate-950 font-black uppercase tracking-widest rounded-xl hover:bg-sky-400">Insert</Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
+                        
+                        <Button variant={activeTool === 'add-support' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'add-support' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('add-support')} title="Add Support"><SupportIcon /></Button>
+                        <Button variant={activeTool === 'add-point-load' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'add-point-load' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('add-point-load')} title="Add Point Load"><ArrowDownToLine className="h-4 w-4" /></Button>
+                        <Button variant={activeTool === 'add-udl' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'add-udl' ? "bg-sky-500 text-slate-950" : "text-white")} onClick={() => setActiveTool('add-udl')} title="Add UDL"><UDLIcon /></Button>
+                        
+                        <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
+                        
+                        <Button variant={activeTool === 'delete' ? 'secondary' : 'ghost'} size="icon" className={cn("rounded-xl transition-all", activeTool === 'delete' ? "bg-sky-500 text-slate-950" : "text-red-500")} onClick={() => setActiveTool('delete')} title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                        
+                        <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
+                        
+                        <Button variant="ghost" size="icon" className="text-white" onClick={() => setZoom(p => Math.min(p + 0.1, 5))} title="Zoom In"><ZoomIn className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-white" onClick={() => setZoom(p => Math.max(p - 0.1, 0.2))} title="Zoom Out"><ZoomOut className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-white" onClick={() => { setZoom(1); setPan({x:0,y:0}); }} title="Reset View"><RotateCcw className="h-4 w-4" /></Button>
+                        
+                        <Separator orientation="vertical" className="h-8 mx-1 bg-slate-800" />
+                        
+                        <Button variant="ghost" size="icon" className="text-white" onClick={undo} disabled={historyIndex === 0} title="Undo"><Undo className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-white" onClick={redo} disabled={historyIndex === history.length-1} title="Redo"><Redo className="h-4 w-4" /></Button>
+                    </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                <div className="lg:col-span-3 flex flex-col gap-2 p-4 bg-slate-950/50 border border-slate-800 rounded-[2.5rem]">
-                    <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-4 mb-2">Editor Tools</h4>
-                    <Button variant={activeTool === 'draw-member' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('draw-member')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"><MemberDrawIcon /><span className="ml-2">Draw Member</span></Button>
-                    <Button variant={activeTool === 'draw-node' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('draw-node')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"><CircleDot className="mr-2 h-4 w-4" /> Draw Node</Button>
-                    <Button variant={activeTool === 'assign' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('assign')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"><Paintbrush className="mr-2 h-4 w-4" /> Assign Props</Button>
-                    <Separator className="my-2 bg-slate-800" />
-                    <Button variant={activeTool === 'add-support' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('add-support')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"><SupportIcon /><span className="ml-2">Support</span></Button>
-                    <Button variant={activeTool === 'add-point-load' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('add-point-load')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"><ArrowDownToLine className="mr-2 h-4 w-4" /> Point Load</Button>
-                    <Button variant={activeTool === 'add-udl' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('add-udl')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"><UDLIcon /><span className="ml-2">UDL</span></Button>
-                    <Separator className="my-2 bg-slate-800" />
-                    <div className="grid grid-cols-2 gap-2">
-                        <Popover>
-                            <PopoverTrigger asChild><Button variant="ghost" className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest text-sky-400"><Database className="mr-2 h-4 w-4" /> Material</Button></PopoverTrigger>
-                            <PopoverContent className="w-72 bg-slate-900 border-slate-800 text-white rounded-3xl p-6 shadow-2xl">
-                                <h4 className="font-black text-white uppercase text-xs tracking-widest mb-4 border-b border-slate-800 pb-2">Material Library</h4>
-                                <div className="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                    {materials.map(m => (
-                                        <div key={m.id} className="space-y-2 p-3 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
-                                            <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase text-sky-500">{m.name}</span><button onClick={() => setActiveMaterialId(m.id)} className={cn("w-3 h-3 rounded-full border-2", activeMaterialId === m.id ? "bg-sky-500 border-sky-400 shadow-lg shadow-sky-500/20" : "border-slate-700")} /></div>
-                                            <div className="flex gap-2 items-center"><Label className="text-[9px] uppercase font-bold text-slate-500">E (GPa)</Label><Input type="number" value={isNaN(m.E) ? "" : m.E/1e9} onChange={e => handleUpdateMaterial(m.id, parseFloat(e.target.value)*1e9)} className="h-8 text-[10px] bg-slate-900 border-slate-800 text-white" /></div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </PopoverContent>
-                        </Popover>
-                        <Popover>
-                            <PopoverTrigger asChild><Button variant="ghost" className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest text-sky-400"><BoxIcon className="mr-2 h-4 w-4" /> Section</Button></PopoverTrigger>
-                            <PopoverContent className="w-80 bg-slate-900 border-slate-800 text-white rounded-3xl p-6 shadow-2xl">
-                                <div className="flex flex-col h-full max-h-[400px]">
-                                    <h4 className="font-black text-white uppercase text-xs tracking-widest mb-4 border-b border-slate-800 pb-2">Section Library</h4>
-                                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4 mb-6">
-                                        {sections.map(s => (
-                                            <div key={s.id} className="space-y-2 p-3 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
-                                                <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase text-sky-500">{s.name}</span><button onClick={() => setActiveSectionId(s.id)} className={cn("w-3 h-3 rounded-full border-2", activeSectionId === s.id ? "bg-sky-500 border-sky-400 shadow-lg shadow-sky-500/20" : "border-slate-700")} /></div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    {s.type === 'rect' ? <>
-                                                        <div className="flex flex-col gap-1"><Label className="text-[8px] uppercase text-slate-500">B (m)</Label><Input type="number" value={isNaN(s.dims.b) ? "" : s.dims.b} onChange={e => handleUpdateSection(s.id, {...s.dims, b: e.target.value})} className="h-7 text-[10px] bg-slate-900 text-white" /></div>
-                                                        <div className="flex flex-col gap-1"><Label className="text-[8px] uppercase text-slate-500">H (m)</Label><Input type="number" value={isNaN(s.dims.h) ? "" : s.dims.h} onChange={e => handleUpdateSection(s.id, {...s.dims, h: e.target.value})} className="h-7 text-[10px] bg-slate-900 text-white" /></div>
-                                                    </> : <div className="flex flex-col gap-1"><Label className="text-[8px] uppercase text-slate-500">D (m)</Label><Input type="number" value={isNaN(s.dims.d) ? "" : s.dims.d} onChange={e => handleUpdateSection(s.id, {...s.dims, d: e.target.value})} className="h-7 text-[10px] bg-slate-900 text-white" /></div>}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3">
-                                        <h5 className="text-[9px] font-black uppercase text-slate-500 tracking-widest italic">Define New Section</h5>
-                                        <Input value={newSecName} onChange={e => setNewSecName(e.target.value)} placeholder="Section Name" className="h-8 text-[10px] bg-slate-900 text-white" />
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <Select value={newSecType} onValueChange={(v:any) => setNewSecType(v)}>
-                                                <SelectTrigger className="h-8 text-[10px] bg-slate-900 text-white"><SelectValue /></SelectTrigger>
-                                                <SelectContent className="bg-slate-900 border-slate-800 text-white"><SelectItem value="rect">Rect</SelectItem><SelectItem value="circ">Circ</SelectItem></SelectContent>
-                                            </Select>
-                                            <Button onClick={handleAddSection} className="h-8 bg-sky-500 text-slate-950 rounded-lg hover:bg-sky-400"><Plus className="w-3 h-3" /></Button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {newSecType === 'rect' ? <>
-                                                <Input type="number" value={newSecB} onChange={e => setNewSecB(e.target.value)} placeholder="B (m)" className="h-7 text-[10px] bg-slate-900 text-white" />
-                                                <Input type="number" value={newSecH} onChange={e => setNewSecH(e.target.value)} placeholder="H (m)" className="h-7 text-[10px] bg-slate-900 text-white" />
-                                            </> : <Input type="number" value={newSecD} onChange={e => setNewSecD(e.target.value)} placeholder="D (m)" className="h-7 text-[10px] bg-slate-900 col-span-2 text-white" />}
-                                        </div>
-                                    </div>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
+                {/* Enhanced Sidebar */}
+                <div className="lg:col-span-3 flex flex-col gap-8 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                    {/* Active Property Selectors */}
+                    <div className="bg-slate-950/50 border border-slate-800 p-6 rounded-[2rem] space-y-6">
+                        <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-1 italic">Active Assignment</h4>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-[9px] uppercase font-black text-slate-500">Active Material</Label>
+                                <Select value={activeMaterialId} onValueChange={setActiveMaterialId}>
+                                    <SelectTrigger className="bg-slate-900 border-slate-800 rounded-xl h-10 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                                        {materials.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[9px] uppercase font-black text-slate-500">Active Section</Label>
+                                <Select value={activeSectionId} onValueChange={setActiveSectionId}>
+                                    <SelectTrigger className="bg-slate-900 border-slate-800 rounded-xl h-10 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                                        {sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button variant={activeTool === 'assign' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('assign')} className="w-full justify-center rounded-xl font-black text-[10px] uppercase tracking-widest transition-all bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500 hover:text-slate-950"><Paintbrush className="mr-2 h-3.5 w-3.5" /> Bulk Assign</Button>
+                        </div>
                     </div>
-                    <Separator className="my-2 bg-slate-800" />
-                    <Button variant={activeTool === 'delete' ? 'secondary' : 'ghost'} onClick={() => setActiveTool('delete')} className="justify-start rounded-xl font-black text-[10px] uppercase tracking-widest text-red-500 transition-all"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
-                    <Button onClick={handleAnalyze} className="mt-8 bg-sky-500 text-slate-950 font-black py-6 rounded-2xl transition-all uppercase tracking-widest text-[10px] shadow-xl hover:bg-sky-400 shadow-sky-500/20 active:scale-95">Run Analysis</Button>
+
+                    {/* Material Library List */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center px-2">
+                            <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">Material Library</h4>
+                        </div>
+                        <div className="space-y-2">
+                            {materials.map(m => (
+                                <div key={m.id} className="group flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl shadow-inner hover:border-sky-500/30 transition-all">
+                                    <div>
+                                        <p className="text-[10px] font-black text-white uppercase">{m.name}</p>
+                                        <p className="text-[9px] text-slate-500 font-bold">E: {m.E/1e9} GPa</p>
+                                    </div>
+                                    <Popover>
+                                        <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-sky-400"><Plus className="h-3 w-3" /></Button></PopoverTrigger>
+                                        <PopoverContent className="w-64 bg-slate-900 border-slate-800 p-4">
+                                            <Label className="text-[10px] uppercase font-black text-slate-500 mb-2 block">Modulus E (GPa)</Label>
+                                            <Input type="number" value={m.E/1e9} onChange={e => handleUpdateMaterial(m.id, parseFloat(e.target.value)*1e9)} className="bg-slate-950 border-slate-800 h-8 text-xs text-white" />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Section Library List */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center px-2">
+                            <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">Section Library</h4>
+                            <Popover>
+                                <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 text-sky-500"><Plus className="h-4 w-4" /></Button></PopoverTrigger>
+                                <PopoverContent className="w-72 bg-slate-900 border-slate-800 p-6 rounded-3xl shadow-2xl">
+                                    <h5 className="text-[10px] font-black uppercase text-white mb-4 border-b border-slate-800 pb-2 italic">Define New Section</h5>
+                                    <div className="space-y-4">
+                                        <Input value={newSecName} onChange={e => setNewSecName(e.target.value)} placeholder="Section Name" className="h-9 text-[10px] bg-slate-950 border-slate-800" />
+                                        <Select value={newSecType} onValueChange={(v:any) => setNewSecType(v)}>
+                                            <SelectTrigger className="h-9 text-[10px] bg-slate-950 border-slate-800"><SelectValue /></SelectTrigger>
+                                            <SelectContent className="bg-slate-900 border-slate-800"><SelectItem value="rect">Rectangular</SelectItem><SelectItem value="circ">Circular</SelectItem></SelectContent>
+                                        </Select>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {newSecType === 'rect' ? <>
+                                                <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">B (m)</Label><Input type="number" value={newSecB} onChange={e => setNewSecB(e.target.value)} className="h-8 text-[10px] bg-slate-950 border-slate-800" /></div>
+                                                <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">H (m)</Label><Input type="number" value={newSecH} onChange={e => setNewSecH(e.target.value)} className="h-8 text-[10px] bg-slate-950 border-slate-800" /></div>
+                                            </> : <div className="col-span-2 space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">D (m)</Label><Input type="number" value={newSecD} onChange={e => setNewSecD(e.target.value)} className="h-8 text-[10px] bg-slate-950 border-slate-800" /></div>}
+                                        </div>
+                                        <Button onClick={handleAddSection} className="w-full bg-sky-500 text-slate-950 font-black uppercase tracking-widest text-[10px]">Create Section</Button>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="space-y-2">
+                            {sections.map(s => (
+                                <div key={s.id} className="group flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl shadow-inner hover:border-sky-500/30 transition-all">
+                                    <div>
+                                        <p className="text-[10px] font-black text-white uppercase">{s.name}</p>
+                                        <p className="text-[9px] text-slate-500 font-bold">{s.type === 'rect' ? `${s.dims.b}x${s.dims.h}m` : `Ø${s.dims.d}m`}</p>
+                                    </div>
+                                    <Popover>
+                                        <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-sky-400"><Plus className="h-3 w-3" /></Button></PopoverTrigger>
+                                        <PopoverContent className="w-64 bg-slate-900 border-slate-800 p-4">
+                                            <div className="space-y-3">
+                                                {s.type === 'rect' ? <>
+                                                    <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">B (m)</Label><Input type="number" value={s.dims.b} onChange={e => handleUpdateSection(s.id, {...s.dims, b: e.target.value})} className="h-8 text-[10px] bg-slate-950 border-slate-800" /></div>
+                                                    <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">H (m)</Label><Input type="number" value={s.dims.h} onChange={e => handleUpdateSection(s.id, {...s.dims, h: e.target.value})} className="h-8 text-[10px] bg-slate-950 border-slate-800" /></div>
+                                                </> : <div className="space-y-1"><Label className="text-[9px] uppercase font-bold text-slate-500">D (m)</Label><Input type="number" value={s.dims.d} onChange={e => handleUpdateSection(s.id, {...s.dims, d: e.target.value})} className="h-8 text-[10px] bg-slate-950 border-slate-800" /></div>}
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <Button onClick={handleAnalyze} className="mt-4 bg-sky-500 text-slate-950 font-black py-6 rounded-2xl transition-all uppercase tracking-widest text-[10px] shadow-xl hover:bg-sky-400 shadow-sky-500/20 active:scale-95 shrink-0">Run Analysis</Button>
                 </div>
 
+                {/* Main Modeling Area */}
                 <div className="lg:col-span-9 space-y-6">
-                    <div className="w-full h-[500px] border-2 border-slate-800 rounded-[2.5rem] bg-slate-950 overflow-hidden relative shadow-2xl">
+                    <div className="w-full h-[550px] border-2 border-slate-800 rounded-[2.5rem] bg-slate-950 overflow-hidden relative shadow-2xl">
                         <svg ref={svgRef} width="100%" height="100%" className={cn(isDraggingPan ? 'cursor-grabbing' : 'cursor-crosshair')} onClick={handleCanvasClick} onMouseDown={handleCanvasMouseDown} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleMouseLeave} onMouseMove={handleMouseMove} onContextMenu={handleCanvasContextMenu}>
-                            <defs><pattern id="grid" width={SNAP_GRID_SIZE * zoom} height={SNAP_GRID_SIZE * zoom} patternUnits="userSpaceOnUse" x={pan.x + canvasSize.width / 2} y={pan.y + canvasSize.height / 2}><path d={`M ${SNAP_GRID_SIZE * zoom} 0 L 0 0 0 ${SNAP_GRID_SIZE * zoom}`} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" /></pattern></defs>
+                            <defs>
+                                <pattern id="grid" width={SNAP_GRID_SIZE * zoom} height={SNAP_GRID_SIZE * zoom} patternUnits="userSpaceOnUse" x={pan.x + canvasSize.width / 2} y={pan.y + canvasSize.height / 2}>
+                                    <path d={`M ${SNAP_GRID_SIZE * zoom} 0 L 0 0 0 ${SNAP_GRID_SIZE * zoom}`} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+                                </pattern>
+                            </defs>
                             <g transform={`translate(${canvasSize.width / 2 + pan.x}, ${canvasSize.height / 2 + pan.y}) scale(${zoom})`}>
                                 <rect width="10000" height="10000" x="-5000" y="-5000" fill="url(#grid)" className="pointer-events-none" />
                                 {members.map(m => {
@@ -865,11 +968,26 @@ export function StructuralAnalysis() {
                             {renderScales(canvasSize, pan, zoom)}
                         </svg>
                     </div>
+                    
+                    {/* Analysis Results Toggle & Summary Dashboard */}
                     <div className="flex flex-col gap-6">
-                        {analysisResult && <div className="flex bg-slate-950 p-1.5 rounded-2xl border-2 border-slate-800 shadow-2xl w-fit">
-                            {['reactions', 'shear', 'moment', 'deflection'].map(t => <button key={t} onClick={() => setActiveResultDiagram(t as any)} className={cn("px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeResultDiagram === t ? "bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/20" : "text-slate-500 hover:text-slate-300")}>{t}</button>)}
-                        </div>}
-                        <div className="flex-1 w-full"><h4 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4 px-1">Analysis Summary</h4>{renderResultSummary(analysisResult, activeResultDiagram)}</div>
+                        {analysisResult && (
+                            <div className="flex bg-slate-950 p-1.5 rounded-2xl border-2 border-slate-800 shadow-2xl w-fit">
+                                {['reactions', 'shear', 'moment', 'deflection'].map(t => (
+                                    <button 
+                                        key={t} 
+                                        onClick={() => setActiveResultDiagram(t as any)} 
+                                        className={cn("px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeResultDiagram === t ? "bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/20" : "text-slate-500 hover:text-slate-300")}
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex-1 w-full">
+                            <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4 px-1 italic">Structural Performance Dashboard</h4>
+                            {renderResultSummary(analysisResult)}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -987,7 +1105,7 @@ function renderReactions(res: AnalysisResult | null, diag: string | null, getNod
     return <g>{g}</g>;
 }
 
-function renderResultSummary(res: AnalysisResult | null, diag: string | null) {
+function renderResultSummary(res: AnalysisResult | null) {
     if (!res) return <div className="bg-slate-950/50 border border-slate-800 p-6 rounded-3xl flex items-center gap-4"><AlertCircle className="h-5 w-5 text-sky-500" /><div><h5 className="font-black text-white uppercase text-xs tracking-widest italic">Static Model Ready</h5><p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Connect nodes and apply boundary conditions to analyze.</p></div></div>;
     
     const allForces = Object.values(res.memberForces!).flat();
