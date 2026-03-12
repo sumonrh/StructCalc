@@ -67,8 +67,8 @@ export function UnitConversion() {
 
   const currentUnits = useMemo(() => unitsByCategory[category], [category]);
 
-  const handleCategoryChange = (newCategory: string) => {
-    const cat = newCategory as UnitCategory;
+  const handleCategoryChange = (val: string) => {
+    const cat = val as UnitCategory;
     setCategory(cat);
     const newUnits = unitsByCategory[cat];
     setFromUnit(newUnits[0]);
@@ -83,14 +83,13 @@ export function UnitConversion() {
     const value = parseFloat(inputValue);
     if (!isNaN(value)) {
       const factors = conversionFactors[category];
-      const valueInBaseUnit = value * (factors[fromUnit] || 1);
-      const convertedValue = valueInBaseUnit / (factors[toUnit] || 1);
-      setOutputValue(Number(convertedValue.toPrecision(6)).toString());
+      const valBase = value * (factors[fromUnit] || 1);
+      const converted = valBase / (factors[toUnit] || 1);
+      setOutputValue(Number(converted.toPrecision(6)).toString());
     } else {
       setOutputValue('');
     }
   }, [inputValue, fromUnit, toUnit, category]);
-
 
   const getIcon = (cat: UnitCategory) => {
     switch (cat) {
@@ -135,14 +134,12 @@ export function UnitConversion() {
                 onChange={handleInputChange}
                 className="bg-slate-950 border-2 border-slate-800 rounded-2xl p-6 text-sm font-bold text-white focus:border-sky-500 outline-none transition-all shadow-inner flex-grow w-full"
               />
-              <Select value={fromUnit} onValueChange={(v) => setFromUnit(v)}>
+              <Select value={fromUnit} onValueChange={setFromUnit}>
                 <SelectTrigger className="w-[100px] bg-slate-950 border-2 border-slate-800 rounded-2xl text-xs font-bold text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-800 text-white shadow-2xl">
-                  {currentUnits.map((unit) => (
-                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                  ))}
+                  {currentUnits.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -157,22 +154,20 @@ export function UnitConversion() {
                 readOnly
                 className="bg-slate-950 border-2 border-slate-800 rounded-2xl p-6 text-sm font-bold text-sky-400 focus:border-sky-500 outline-none transition-all shadow-inner flex-grow cursor-default w-full"
               />
-              <Select value={toUnit} onValueChange={(v) => setToUnit(v)}>
+              <Select value={toUnit} onValueChange={setToUnit}>
                 <SelectTrigger className="w-[100px] bg-slate-950 border-2 border-slate-800 rounded-2xl text-xs font-bold text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-900 border-slate-800 text-white shadow-2xl">
-                  {currentUnits.map((unit) => (
-                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                  ))}
+                  {currentUnits.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
         </div>
         
-        <div className="pt-6 border-t border-slate-800">
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center">
+        <div className="pt-6 border-t border-slate-800 text-center">
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                 {inputValue || 0} {fromUnit} = <span className="text-sky-400">{outputValue || 0} {toUnit}</span>
             </p>
         </div>
