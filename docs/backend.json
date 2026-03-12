@@ -1,0 +1,493 @@
+{
+  "entities": {
+    "Material": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Material",
+      "type": "object",
+      "description": "Represents a structural material with its physical properties, which can be preloaded or custom-defined by the user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Material entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Common name or designation of the material (e.g., 'A36 Steel', 'C30 Concrete', 'Douglas Fir Timber')."
+        },
+        "type": {
+          "type": "string",
+          "description": "Categorization of the material (e.g., 'Steel', 'Concrete', 'Timber', 'Custom')."
+        },
+        "youngsModulus": {
+          "type": "number",
+          "description": "Modulus of Elasticity (E) of the material. Units are context-dependent and handled by the app's unit conversion."
+        },
+        "yieldStrength": {
+          "type": "number",
+          "description": "Yield strength of the material, primarily relevant for ductile materials like steel. Units are context-dependent."
+        },
+        "ultimateStrength": {
+          "type": "number",
+          "description": "Ultimate tensile strength of the material. Units are context-dependent."
+        },
+        "compressiveStrength": {
+          "type": "number",
+          "description": "Compressive strength of the material, primarily relevant for brittle materials like concrete. Units are context-dependent."
+        },
+        "density": {
+          "type": "number",
+          "description": "Mass density of the material. Units are context-dependent."
+        },
+        "poissonsRatio": {
+          "type": "number",
+          "description": "Poisson's ratio (v) of the material, indicating lateral strain properties (unitless)."
+        },
+        "isCustom": {
+          "type": "boolean",
+          "description": "Indicates if this material was added by a user (true) or is a preloaded default material (false)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time when the material entry was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time when the material entry was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type",
+        "youngsModulus",
+        "density",
+        "poissonsRatio",
+        "isCustom",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Section": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Section",
+      "type": "object",
+      "description": "Represents a specific structural cross-section with its geometric dimensions and calculated properties. Can be preloaded or custom-defined.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Section entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "User-friendly name or designation for the specific section (e.g., 'W14x22 I-Beam', 'Circular Column 300mm', 'Custom Rectangle')."
+        },
+        "shapeType": {
+          "type": "string",
+          "description": "The geometric shape category of the section (e.g., 'Rectangle', 'I-Beam', 'Circle', 'Angle', 'Channel')."
+        },
+        "description": {
+          "type": "string",
+          "description": "An optional detailed description or notes about the section."
+        },
+        "width": {
+          "type": "number",
+          "description": "Overall width of the section. Applicable for various shapes (e.g., breadth of a rectangle, flange width of an I-beam)."
+        },
+        "height": {
+          "type": "number",
+          "description": "Overall height or depth of the section. Applicable for various shapes (e.g., depth of a rectangle, overall depth of an I-beam)."
+        },
+        "thickness": {
+          "type": "number",
+          "description": "Thickness for plate-like or thin-walled sections, or a general dimension for simple shapes like a solid circle."
+        },
+        "flangeWidth": {
+          "type": "number",
+          "description": "Width of the flange for sections like I-beams, T-beams, or channels."
+        },
+        "flangeThickness": {
+          "type": "number",
+          "description": "Thickness of the flange for sections like I-beams, T-beams, or channels."
+        },
+        "webThickness": {
+          "type": "number",
+          "description": "Thickness of the web for sections like I-beams, T-beams, or channels."
+        },
+        "radius": {
+          "type": "number",
+          "description": "Radius for circular sections."
+        },
+        "area": {
+          "type": "number",
+          "description": "Calculated cross-sectional area of the section. Units are context-dependent."
+        },
+        "momentOfInertiaX": {
+          "type": "number",
+          "description": "Calculated moment of inertia about the X-axis (major axis). Units are context-dependent."
+        },
+        "momentOfInertiaY": {
+          "type": "number",
+          "description": "Calculated moment of inertia about the Y-axis (minor axis). Units are context-dependent."
+        },
+        "sectionModulusX": {
+          "type": "number",
+          "description": "Calculated section modulus about the X-axis. Units are context-dependent."
+        },
+        "sectionModulusY": {
+          "type": "number",
+          "description": "Calculated section modulus about the Y-axis. Units are context-dependent."
+        },
+        "isCustom": {
+          "type": "boolean",
+          "description": "Indicates if this section was added by a user (true) or is a preloaded standard section (false)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time when the section entry was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time when the section entry was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "shapeType",
+        "isCustom",
+        "area",
+        "momentOfInertiaX",
+        "momentOfInertiaY",
+        "sectionModulusX",
+        "sectionModulusY",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Project": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Project",
+      "type": "object",
+      "description": "Organizes collections of related structural calculations for a specific engineering project.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Project entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "User-defined name for the project (e.g., 'Office Building Annex', 'Bridge Repair Phase 1')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description or notes about the project."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time when the project was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time when the project was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Calculation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Calculation",
+      "type": "object",
+      "description": "Represents a single instance of a saved structural calculation, including its inputs, results, and context.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Calculation entity."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Reference to the Project this calculation belongs to. (Relationship: Project 1:N Calculation)"
+        },
+        "name": {
+          "type": "string",
+          "description": "User-defined name for this specific calculation instance (e.g., 'Beam Deflection - Floor 3, Grid Line A')."
+        },
+        "calculationType": {
+          "type": "string",
+          "description": "The category or type of structural calculation performed (e.g., 'BeamDesign', 'ColumnDesign', 'LoadCombination', 'StressStrain', 'CustomFormula')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the calculation scenario, assumptions, or specific conditions."
+        },
+        "inputs": {
+          "type": "string",
+          "description": "A serialized JSON object or string containing all input parameters for the calculation. Its structure varies based on 'calculationType'."
+        },
+        "results": {
+          "type": "string",
+          "description": "A serialized JSON object or string containing all computed output results from the calculation. Its structure varies based on 'calculationType'."
+        },
+        "materialId": {
+          "type": "string",
+          "description": "Optional reference to the Material used in this calculation. (Relationship: Material 1:N Calculation)"
+        },
+        "sectionId": {
+          "type": "string",
+          "description": "Optional reference to the Section used in this calculation. (Relationship: Section 1:N Calculation)"
+        },
+        "customFormulaId": {
+          "type": "string",
+          "description": "Optional reference to the CustomFormula used for this calculation. (Relationship: CustomFormula 1:N Calculation)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time when the calculation was saved.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time when the calculation was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "name",
+        "calculationType",
+        "inputs",
+        "results",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CustomFormula": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CustomFormula",
+      "type": "object",
+      "description": "Allows users to define and save their own mathematical formulas for future use in calculations.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CustomFormula entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "User-defined name for the custom formula (e.g., 'My Special Beam Formula', 'Custom Stress Check')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of what the custom formula calculates or its purpose."
+        },
+        "formulaExpression": {
+          "type": "string",
+          "description": "The mathematical expression of the formula, often in a parseable string format (e.g., 'P * L^3 / (48 * E * I)')."
+        },
+        "inputParameters": {
+          "type": "array",
+          "description": "A list of variable names (e.g., ['P', 'L', 'E', 'I']) expected as inputs for the formula.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputParameter": {
+          "type": "string",
+          "description": "The name of the resulting output variable calculated by the formula (e.g., 'Deflection', 'Moment')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time when the custom formula was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time when the custom formula was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "formulaExpression",
+        "inputParameters",
+        "outputParameter",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/materials_public/{materialId}",
+        "definition": {
+          "entityName": "Material",
+          "schema": {
+            "$ref": "#/backend/entities/Material"
+          },
+          "description": "Stores preloaded, publicly available structural materials. These are read-only for all authenticated users and managed by administrators.",
+          "params": [
+            {
+              "name": "materialId",
+              "description": "The unique identifier for a public material."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/sections_public/{sectionId}",
+        "definition": {
+          "entityName": "Section",
+          "schema": {
+            "$ref": "#/backend/entities/Section"
+          },
+          "description": "Stores preloaded, publicly available structural cross-sections. These are read-only for all authenticated users and managed by administrators.",
+          "params": [
+            {
+              "name": "sectionId",
+              "description": "The unique identifier for a public section."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{adminId}",
+        "definition": {
+          "entityName": "admin",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Designates users with administrative privileges. The existence of a document here grants admin access for managing public data. This follows the DBAC pattern of 'existence over content'.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "The unique Firebase Authentication UID of an administrative user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/custom_materials/{materialId}",
+        "definition": {
+          "entityName": "Material",
+          "schema": {
+            "$ref": "#/backend/entities/Material"
+          },
+          "description": "Stores custom structural materials created by a specific user. Access is restricted to the owner (`userId`). The `isCustom` field should be true. Includes implicit denormalization of ownerId via the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication UID of the material's owner."
+            },
+            {
+              "name": "materialId",
+              "description": "The unique identifier for a user-created custom material."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/custom_sections/{sectionId}",
+        "definition": {
+          "entityName": "Section",
+          "schema": {
+            "$ref": "#/backend/entities/Section"
+          },
+          "description": "Stores custom structural cross-sections created by a specific user. Access is restricted to the owner (`userId`). The `isCustom` field should be true. Includes implicit denormalization of ownerId via the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication UID of the section's owner."
+            },
+            {
+              "name": "sectionId",
+              "description": "The unique identifier for a user-created custom section."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/custom_formulas/{customFormulaId}",
+        "definition": {
+          "entityName": "CustomFormula",
+          "schema": {
+            "$ref": "#/backend/entities/CustomFormula"
+          },
+          "description": "Stores custom formulas defined and saved by a specific user. Access is restricted to the owner (`userId`). Includes implicit denormalization of ownerId via the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication UID of the custom formula's owner."
+            },
+            {
+              "name": "customFormulaId",
+              "description": "The unique identifier for a user-defined custom formula."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores user-owned projects, acting as containers for related calculations. Access is restricted to the owner (`userId`). Includes implicit denormalization of ownerId via the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication UID of the project's owner."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique identifier for a project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}/calculations/{calculationId}",
+        "definition": {
+          "entityName": "Calculation",
+          "schema": {
+            "$ref": "#/backend/entities/Calculation"
+          },
+          "description": "Stores individual calculation instances, nested under their parent project. Access is restricted to the project owner (`userId`). The `projectId` field within the document must match the path's `projectId` for data integrity. Includes implicit denormalization of ownerId via the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique Firebase Authentication UID of the project owner (and thus the calculation owner)."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique identifier of the parent project."
+            },
+            {
+              "name": "calculationId",
+              "description": "The unique identifier for a specific calculation within the project."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to provide secure, scalable, and debuggable access to all application data, strictly adhering to the core design principles and mandates. \n\n**Authorization Independence (CRITICAL):** This structure achieves Authorization Independence by completely avoiding hierarchical authorization dependencies that would require `get()` calls in security rules. All user-specific data (Projects, Custom Materials, Custom Sections, Custom Formulas, and their nested Calculations) are organized under `/users/{userId}/...` paths. This ensures that the ownership (`request.auth.uid == userId`) can be verified directly from the document's path, eliminating the need to fetch parent documents. For instance, a `Calculation`'s access is determined by its path `/users/{userId}/projects/{projectId}/calculations/{calculationId}`, where `userId` from the path must match `request.auth.uid`, making its authorization self-contained within its full path.\n\n**Structural Segregation for Homogeneous Security Posture:** To satisfy Strategy B, preloaded (public) materials and sections are segregated into dedicated top-level collections: `/materials_public` and `/sections_public`. These collections have a uniform security posture (read-only for all authenticated users, writable only by administrators). User-defined (custom) materials and sections are stored under the user's specific path, e.g., `/users/{userId}/custom_materials`, ensuring their security posture is private and owner-specific. This segregation simplifies security rules significantly as each collection's ruleset is clear and consistent.\n\n**QAPs (Rules are not Filters):** This design directly supports secure `list` operations. Because collections are segregated by security posture and ownership, a user querying `/users/{userId}/projects` will only ever see *their own* projects, as the rules will enforce `request.auth.uid == userId`. Similarly, a `list` on `/materials_public` will return all public materials to any authenticated user. There is no need for Firestore rules to filter results; the structure inherently limits the scope of queries to authorized data.\n\n**DBAC (No Custom Claims):** Administrative roles for managing public data are implemented using a dedicated collection `/roles_admin/{adminId}`. The existence of a document at this path for a given `uid` grants administrative privileges, allowing rules to check `exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))`. This keeps roles within the database, as mandated.\n\n**Denormalization:** While `projectId` is present in the `Calculation` document, this is primarily for data integrity and efficient querying, not for authorization rules, as the `projectId` is already part of the path. The `userId` is implicitly denormalized through the path structure for all user-owned data. This ensures atomic creation and updates without complex `get()` rule evaluations.\n\nOverall, this structure provides a clear, maintainable, and secure foundation for the StructoCalc application, prioritizing explicit authorization and efficient rule evaluation."
+  }
+}
