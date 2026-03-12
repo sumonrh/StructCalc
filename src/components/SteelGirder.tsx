@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -247,7 +246,6 @@ export function SteelGirder() {
     if (!libLoaded || !results) return;
     setIsGenerating(true);
     
-    // Explicit wait for the off-screen report to be ready
     setTimeout(async () => {
       try {
         const { jsPDF } = (window as any).jspdf;
@@ -264,7 +262,6 @@ export function SteelGirder() {
             useCORS: true, 
             backgroundColor: '#ffffff', 
             logging: false,
-            // Ensure the element is rendered even if outside viewport
             width: 800,
             height: 1131
           });
@@ -278,7 +275,7 @@ export function SteelGirder() {
       } finally {
         setIsGenerating(false);
       }
-    }, 500); // Increased timeout
+    }, 500);
   };
 
   if (!results) return <div className="p-8 text-slate-400">Loading engineering model...</div>;
@@ -286,9 +283,7 @@ export function SteelGirder() {
   return (
     <div className="bg-slate-950 text-slate-100 font-sans overflow-x-hidden rounded-[3rem]">
       
-      {/* -------------------- OFF-SCREEN PRINTABLE REPORT (Capturable by html2canvas) -------------------- */}
       <div style={{ position: 'fixed', top: 0, left: '-2000px', zIndex: -100, pointerEvents: 'none' }}>
-        {/* PDF PAGE 1 */}
         <div className="pdf-page bg-white text-black" style={{ width: '800px', height: '1131px', padding: '60px', boxSizing: 'border-box' }}>
           <h1 className="text-3xl font-black border-b-4 border-sky-900 pb-4 mb-8 text-center uppercase tracking-widest text-sky-900">
             {results.type === 'i-girder' ? 'I-Girder' : 'Box Girder'} Design Report
@@ -322,7 +317,6 @@ export function SteelGirder() {
           </div>
         </div>
 
-        {/* PDF PAGE 2 */}
         <div className="pdf-page bg-white text-black" style={{ width: '800px', height: '1131px', padding: '60px', boxSizing: 'border-box' }}>
           <h2 className="text-lg font-black mb-6 border-b border-gray-300 pb-1 text-sky-800 uppercase tracking-tighter">3. Capacity Evaluation</h2>
           <div className="space-y-8">
@@ -355,7 +349,6 @@ export function SteelGirder() {
         </div>
       </div>
 
-      {/* -------------------- MAIN APP UI -------------------- */}
       <div className="max-w-6xl mx-auto relative z-10 p-4 md:p-8">
         <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
@@ -388,7 +381,33 @@ export function SteelGirder() {
                 <PlateInput label="Fy (Steel)" unit="MPa" name={activeTab === 'i-girder' ? "fyMPa" : "boxFy"} value={activeTab === 'i-girder' ? inputs.fyMPa : inputs.boxFy} onChange={handleInputChange} />
                 <PlateInput label="L (Unbraced)" unit="mm" name={activeTab === 'i-girder' ? "unbracedL" : "boxL"} value={activeTab === 'i-girder' ? inputs.unbracedL : inputs.boxL} onChange={handleInputChange} />
                 <div className="col-span-2 mt-4"><PlateInput label="Stiffener Spacing (a)" unit="mm" name={activeTab === 'i-girder' ? "stiffenerA" : "boxStiffenerA"} value={activeTab === 'i-girder' ? inputs.stiffenerA : inputs.boxStiffenerA} onChange={handleInputChange} /></div>
-                {activeTab === 'box-girder' && <div className="col-span-2"><PlateInput label="Web Center Spacing" unit="mm" name="boxWebSpacing" value={inputs.boxWebSpacing} onChange={handleInputChange} /></div>}
+                
+                {activeTab === 'i-girder' && (
+                  <>
+                    <div className="col-span-2 mt-4 flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h3 className="text-sky-400 font-bold text-[10px] tracking-widest uppercase opacity-70">Connection Angles</h3>
+                    </div>
+                    <PlateInput label="Top Angle H" unit="mm" name="topAngleH" value={inputs.topAngleH} onChange={handleInputChange} />
+                    <PlateInput label="Top Angle V" unit="mm" name="topAngleV" value={inputs.topAngleV} onChange={handleInputChange} />
+                    <PlateInput label="Top Angle T" unit="mm" name="topAngleT" value={inputs.topAngleT} onChange={handleInputChange} />
+                    <div className="col-span-1" />
+                    <PlateInput label="Bot Angle H" unit="mm" name="botAngleH" value={inputs.botAngleH} onChange={handleInputChange} />
+                    <PlateInput label="Bot Angle V" unit="mm" name="botAngleV" value={inputs.botAngleV} onChange={handleInputChange} />
+                    <PlateInput label="Bot Angle T" unit="mm" name="botAngleT" value={inputs.botAngleT} onChange={handleInputChange} />
+                  </>
+                )}
+
+                {activeTab === 'box-girder' && (
+                  <>
+                    <div className="col-span-2"><PlateInput label="Web Center Spacing" unit="mm" name="boxWebSpacing" value={inputs.boxWebSpacing} onChange={handleInputChange} /></div>
+                    <div className="col-span-2 mt-4 flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h3 className="text-sky-400 font-bold text-[10px] tracking-widest uppercase opacity-70">Box Angles</h3>
+                    </div>
+                    <PlateInput label="Angle Horiz" unit="mm" name="boxAngleH" value={inputs.boxAngleH} onChange={handleInputChange} />
+                    <PlateInput label="Angle Vert" unit="mm" name="boxAngleV" value={inputs.boxAngleV} onChange={handleInputChange} />
+                    <PlateInput label="Angle Thick" unit="mm" name="boxAngleT" value={inputs.boxAngleT} onChange={handleInputChange} />
+                  </>
+                )}
               </div>
             </section>
           </div>
@@ -422,7 +441,6 @@ export function SteelGirder() {
               </div>
             </div>
 
-            {/* RESTORED DETAILED DESIGN INFO */}
             <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl">
               <h2 className="text-xl font-black mb-10 flex items-center gap-4 uppercase text-white tracking-tighter"><FileText className="w-5 h-5" /> Calculation Metadata</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-8 text-[12px] font-mono mb-12 text-slate-300 font-bold">
