@@ -47,7 +47,7 @@ const DownloadIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 );
 const SettingsIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1-2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
 );
 const FileTextIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -334,7 +334,6 @@ export function SteelGirder() {
     const SxBot = Ix / yBar;
     const SxMin = Math.min(SxTop, SxBot);
 
-    // --- RIGOROUS PNA SOLVER (STRIP INTEGRATION) ---
     const sortedYs = [...new Set(rects.flatMap(r => [r.y1, r.y2]))].sort((a, b) => a - b);
     let halfArea = Area / 2, accumulatedArea = 0, yPNA = 0;
     
@@ -660,7 +659,13 @@ export function SteelGirder() {
               <div className="overflow-x-auto rounded-3xl border-2 border-slate-800 shadow-inner">
                 <table className="w-full text-left border-collapse text-[11px]">
                   <thead><tr className="bg-slate-950 text-slate-500 font-black uppercase tracking-widest"><th className="py-4 px-6 text-left">Part</th><th className="py-4 px-6 text-center">Dimensions (mm)</th><th className="py-4 px-6 text-right">Area (mm²)</th></tr></thead>
-                  <tbody>{results.rects.map((r: any, i: number) => (<tr key={i} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-all font-bold"><td className="py-4 px-6 text-slate-200">{r.label}</td><td className="py-4 px-6 text-slate-400 text-center font-mono">{r.b.toFixed(1)} x {r.h.toFixed(1)}</td><td className="py-4 px-6 text-right text-sky-400 font-black font-mono">{r.area.toLocaleString()}</td></tr>))}</tbody>
+                  <tbody>{results.rects.map((r: any, i: number) => (
+                    <tr key={i} className="border-b border-slate-800/40 hover:bg-slate-800/20 transition-all font-bold">
+                      <td className="py-4 px-6 text-slate-200">{r.label}</td>
+                      <td className="py-4 px-6 text-slate-400 text-center font-mono">{r.b.toFixed(1)} x {r.h.toFixed(1)}</td>
+                      <td className="py-4 px-6 text-right text-sky-400 font-black font-mono">{r.area.toLocaleString()}</td>
+                    </tr>
+                  ))}</tbody>
                 </table>
               </div>
             </div>
