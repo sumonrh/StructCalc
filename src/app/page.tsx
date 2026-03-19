@@ -155,7 +155,7 @@ export default function Home() {
               StrucTCalc Engineering Suite © {new Date().getFullYear()}
             </p>
             <p className="text-[10px] text-slate-700 font-bold max-w-xs uppercase leading-loose">
-              Built with precision and high-performance components by{' '' '}
+              Built with precision and high-performance components by{' '}
               <a
                 href="https://firebase.google.com/studio"
                 target="_blank"
