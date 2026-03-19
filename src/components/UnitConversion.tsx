@@ -4,6 +4,7 @@ import { useState, useEffect, ChangeEvent, useMemo } from 'react';
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Ruler, Weight, Square, Sigma } from 'lucide-react'; 
+import { useToast } from '@/hooks/use-toast';
 
 type UnitCategory = 'length' | 'force' | 'area' | 'stress';
 type Unit = string; 
@@ -59,6 +60,7 @@ const unitsByCategory: Record<UnitCategory, Unit[]> = {
 };
 
 export function UnitConversion() {
+  const { toast } = useToast();
   const [category, setCategory] = useState<UnitCategory>('length');
   const [fromUnit, setFromUnit] = useState<Unit>(unitsByCategory['length'][0]);
   const [toUnit, setToUnit] = useState<Unit>(unitsByCategory['length'][1]);

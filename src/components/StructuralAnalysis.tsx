@@ -56,7 +56,7 @@ const UDLIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 12h18" />
         <path d="M5 8v4M9 8v4M13 8v4M17 8v4M21 8v4" />
-        <path d="M4 9l1-1 1 1M8 9l1-1 1 1M12 9l1-1 1 1M16 9l1-1 1 1M20 9l1-1 1 1" />
+        <path d="M4 9l1-1 1 1M8 9l1-1 1 1M16 9l1-1 1 1M20 9l1-1 1 1" />
     </svg>
 );
 
@@ -461,7 +461,6 @@ export function StructuralAnalysis() {
             <div className="flex gap-10">
                 {/* Collapsible Sidebar */}
                 <div className={cn("flex flex-col gap-8 transition-all duration-300 ease-in-out relative shrink-0", isSidebarOpen ? "w-72" : "w-12 overflow-hidden")}>
-                    {/* Toggle Button */}
                     <Button 
                         variant="ghost" 
                         size="icon" 

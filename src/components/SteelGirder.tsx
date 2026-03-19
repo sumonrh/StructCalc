@@ -8,12 +8,12 @@ import React, { useState, useEffect, useRef } from 'react';
 const Utils = {
   num: (v: any, name: string) => {
     const n = Number(v);
-    if (!Number.isFinite(n)) return 0;
+    if (!Number.isFinite(n)) throw new Error(`Invalid numeric input for ${name}.`);
     return n;
   },
   positive: (v: any, name: string, allowZero = false) => {
     const n = Utils.num(v, name);
-    if (allowZero ? n < 0 : n <= 0) return 0;
+    if (allowZero ? n < 0 : n <= 0) throw new Error(`${name} must be ${allowZero ? '>= 0' : '> 0'}.`);
     return n;
   },
   round: (v: number, d = 3) => {
