@@ -1,0 +1,3 @@
+﻿src/components/StructuralAnalysis.tsx(504,41): error TS2783: 'fill' is specified more than once, so this usage will be overwritten.
+src/components/StructuralAnalysis.tsx(538,71): error TS2783: 'fill' is specified more than once, so this usage will be overwritten.
+src/components/UnitConversion.tsx(122,6): error TS2554: Expected 0-1 arguments, but got 2.

@@ -1,0 +1,160 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * STRUCTOCALC SECURITY RULES DOCUMENTATION
+     *
+     * Core Philosophy:
+     * This ruleset implements a robust, path-based authorization model designed for high-performance 
+     * security evaluation. Ownership is primarily determined by a user's presence in the document 
+     * path, eliminating the need for expensive recursive lookups (Authorization Independence).
+     *
+     * Data Structure:
+     * 1. Public Libraries: /materials_public and /sections_public contain preloaded engineering 
+     *    data accessible to all signed-in users but manageable only by administrators.
+     * 2. Administrative Roles: /roles_admin/{adminId} uses a Database-Based Access Control (DBAC) 
+     *    pattern where the existence of a document grants administrative privileges.
+     * 3. User Workspace: All user-generated content (Projects, Calculations, Custom Materials/Sections) 
+     *    is strictly nested under /users/{userId}/.
+     *
+     * Key Security Decisions:
+     * - "Rules are not Filters": Users can only query their own data trees, ensuring 
+     *    privacy and query performance.
+     * - Relational Integrity: On create/update, rules enforce that internal foreign keys 
+     *    (like projectId) match the hierarchical path to prevent data cross-linking.
+     * - Immutability: Critical relationship IDs are immutable once a document is created.
+     * - Prototyping Flexibility: This ruleset enforces strict authorization but allows 
+     *    flexible data schemas for rapid iteration.
+     */
+
+    // --- HELPER FUNCTIONS ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Combined existence and ownership check for destructive/modifying operations
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // DBAC: Checks for the existence of an admin document for the current user
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Publicly available material library managed by admins.
+     * @path /materials_public/{materialId}
+     * @allow (get) Any signed-in user.
+     * @deny (create) Non-admin users attempting to add new public materials.
+     * @principle Structural Segregation for Homogeneous Security Posture.
+     */
+    match /materials_public/{materialId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Publicly available cross-section library managed by admins.
+     * @path /sections_public/{sectionId}
+     * @allow (get) Any signed-in user.
+     * @deny (update) Non-admin users attempting to modify standard sections.
+     * @principle Structural Segregation for Homogeneous Security Posture.
+     */
+    match /sections_public/{sectionId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Storage for administrative UIDs. Access is restricted.
+     * @path /roles_admin/{adminId}
+     * @allow (get) Any signed-in user (to verify their own or others' roles if needed).
+     * @deny (list/write) Client-side listing or modification of admin roles.
+     * @principle DBAC (Database-Based Access Control).
+     */
+    match /roles_admin/{adminId} {
+      allow get: if isSignedIn();
+      allow list, create, update, delete: if false;
+    }
+
+    /**
+     * @description User-created custom materials. Private to the owner.
+     * @path /users/{userId}/custom_materials/{materialId}
+     * @allow (create) User matching userId, provided document ID is set correctly.
+     * @deny (get) User A trying to read User B's custom materials.
+     * @principle Authorization Independence via path-based ownership.
+     */
+    match /users/{userId}/custom_materials/{materialId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == materialId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description User-created custom sections. Private to the owner.
+     * @path /users/{userId}/custom_sections/{sectionId}
+     * @allow (list) User listing their own sections.
+     * @deny (delete) User trying to delete a section they do not own.
+     * @principle Enforces path consistency for relational IDs.
+     */
+    match /users/{userId}/custom_sections/{sectionId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == sectionId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description User-defined mathematical formulas. Private to the owner.
+     * @path /users/{userId}/custom_formulas/{customFormulaId}
+     * @allow (update) Owner modifying a formula while keeping ID immutable.
+     * @deny (create) Mismatched path userId and auth UID.
+     * @principle Path-based ownership for write operations.
+     */
+    match /users/{userId}/custom_formulas/{customFormulaId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == customFormulaId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Engineering projects acting as containers for calculations.
+     * @path /users/{userId}/projects/{projectId}
+     * @allow (get) Project owner.
+     * @deny (update) Changing the project ID field on an existing project.
+     * @principle Authorization Independence and ID Immutability.
+     */
+    match /users/{userId}/projects/{projectId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == projectId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Specific calculation instances within a project.
+     * @path /users/{userId}/projects/{projectId}/calculations/{calculationId}
+     * @allow (create) Owner ensuring the calculation's projectId matches the path.
+     * @deny (list) Anonymous user or mismatched user ID.
+     * @principle Relational integrity between path and document data.
+     */
+    match /users/{userId}/projects/{projectId}/calculations/{calculationId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.projectId == projectId;
+      allow update: if isExistingOwner(userId) && request.resource.data.projectId == resource.data.projectId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+  }
+}
