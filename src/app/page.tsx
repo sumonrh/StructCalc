@@ -8,10 +8,10 @@ import { RCColumnAnalysis } from '@/components/RCColumnAnalysis';
 import { StructuralAnalysis } from '@/components/StructuralAnalysis';
 import { LiveLoadAnalysis } from '@/components/LiveLoadAnalysis';
 import { SteelGirder } from '@/components/SteelGirder';
-import { SectionPro } from '@/components/SectionPro';
 import { ContactForm } from '@/components/ContactForm';
+import { SectionPropertyPro } from '@/components/SectionPropertyPro';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ruler, DraftingCompass, Workflow, Truck, Square, Activity, Box, MoveVertical, ShieldAlert, SquareArrowDown, Mail, Github, AlertTriangle, LayoutPanelTop } from 'lucide-react';
+import { Ruler, DraftingCompass, Workflow, Truck, Square, Activity, Box, MoveVertical, ShieldAlert, SquareArrowDown, Mail, Github, AlertTriangle, Zap } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -25,9 +25,9 @@ export default function Home() {
                 <Workflow className="mr-2 h-4 w-4" />
                 Analysis
               </TabsTrigger>
-              <TabsTrigger value="section-pro" className="rounded-[2rem] px-6 py-3 data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 font-black text-xs uppercase tracking-widest transition-all">
-                <LayoutPanelTop className="mr-2 h-4 w-4" />
-                Section Pro
+              <TabsTrigger value="section-prop" className="rounded-[2rem] px-6 py-3 data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 font-black text-xs uppercase tracking-widest transition-all">
+                <Zap className="mr-2 h-4 w-4" />
+                Section Props
               </TabsTrigger>
               <TabsTrigger value="live-load" className="rounded-[2rem] px-6 py-3 data-[state=active]:bg-sky-500 data-[state=active]:text-slate-950 font-black text-xs uppercase tracking-widest transition-all">
                 <Truck className="mr-2 h-4 w-4" />
@@ -62,8 +62,8 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          <TabsContent value="section-pro" className="mt-0 outline-none">
-            <SectionPro />
+          <TabsContent value="section-prop" className="mt-0 outline-none">
+            <SectionPropertyPro />
           </TabsContent>
 
           <TabsContent value="live-load" className="mt-0 outline-none">
@@ -155,7 +155,7 @@ export default function Home() {
               StrucTCalc Engineering Suite © {new Date().getFullYear()}
             </p>
             <p className="text-[10px] text-slate-700 font-bold max-w-xs uppercase leading-loose">
-              Built with precision and high-performance components by{' '}
+              Built with precision and high-performance components by{' '' '}
               <a
                 href="https://firebase.google.com/studio"
                 target="_blank"
