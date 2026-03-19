@@ -124,7 +124,6 @@ export default function Home() {
 
       <footer className="py-16 border-t border-slate-900 bg-slate-950">
         <div className="container mx-auto px-6 space-y-12">
-          {/* Disclaimer Section */}
           <div className="bg-slate-900/50 border-2 border-slate-800 rounded-[3rem] p-8 md:p-12 max-w-5xl mx-auto flex flex-col md:flex-row items-center md:items-start gap-8 shadow-inner">
             <div className="bg-amber-500/10 p-4 rounded-3xl border border-amber-500/20">
               <AlertTriangle className="h-10 w-10 text-amber-500" />
