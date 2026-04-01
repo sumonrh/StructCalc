@@ -397,16 +397,16 @@ export function WingwallDesign() {
                 <div className="space-y-6 relative z-10 flex-grow">
                   <h3 className="text-[10px] font-black uppercase opacity-40 tracking-[0.3em]">Reinforcement Schedule</h3>
                   <div className="space-y-2">
-                    <p className="text-5xl font-black tracking-tighter text-sky-400 group-hover:scale-105 transition-transform origin-left">{params.barSizeMain} @ {results.spacingMain} <span className="text-xl">mm</span></p>
-                    <p className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                    <div className="text-5xl font-black tracking-tighter text-sky-400 group-hover:scale-105 transition-transform origin-left">{params.barSizeMain} @ {results.spacingMain} <span className="text-xl">mm</span></div>
+                    <div className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
                       <div className="w-8 h-1 bg-sky-500 rounded-full" /> Horizontal Main Tension
-                    </p>
+                    </div>
                   </div>
                   <div className="space-y-2 border-t border-background/10 pt-6">
-                    <p className="text-3xl font-black text-slate-400">{params.barSizeSec} @ {results.spacingSec} <span className="text-lg">mm</span></p>
-                    <p className="text-[10px] font-black uppercase opacity-40 flex items-center gap-2">
+                    <div className="text-3xl font-black text-slate-400">{params.barSizeSec} @ {results.spacingSec} <span className="text-lg">mm</span></div>
+                    <div className="text-[10px] font-black uppercase opacity-40 flex items-center gap-2">
                       <div className="w-8 h-1 bg-slate-600 rounded-full" /> Vertical Secondary Shrinkage
-                    </p>
+                    </div>
                   </div>
                 </div>
                 <div className="bg-background/5 p-8 rounded-[2rem] border border-background/10 text-center min-w-[220px] relative z-10 backdrop-blur">
