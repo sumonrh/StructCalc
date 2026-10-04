@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Play, RotateCcw, Plus, Trash2, Settings, AlertCircle, Download } from 'lucide-react';
+import { analyzeBeam, computeEffectiveIncrement, MAX_AXLES } from '@/lib/beam-engine';
 
 // --- TYPES ---
 
@@ -21,7 +22,10 @@ type AnalysisConfig = {
   I: number; // m^4
   nElemsPerSpan: number;
   truckIncrement: number;
-  loadCase: 'truck' | 'lane';
+  loadCase: 'truck' | 'lane' | 'envelope';
+  dlaOverride?: number | null;
+  dlaMultiplier?: number;
+  laneUdl?: number | null;
 };
 
 type EnvelopePoint = {
@@ -59,280 +63,15 @@ const DEFAULT_CONFIG: AnalysisConfig = {
   nElemsPerSpan: 32,
   truckIncrement: 0.5,
   loadCase: 'truck',
+  dlaOverride: null,
+  dlaMultiplier: 1,
+  laneUdl: 9,
 };
 
-// --- FEM ENGINE ---
-
-class BeamFEM {
-  private config: AnalysisConfig;
-  private spans: Span[];
-  private axles: Axle[];
-
-  constructor(spans: Span[], axles: Axle[], config: AnalysisConfig) {
-    this.spans = spans;
-    this.axles = axles;
-    this.config = config;
-  }
-
-  private solveSystem(K: number[][], F: number[], constrained: boolean[]): number[] {
-    const n = F.length;
-    const map: number[] = [];
-    for (let i = 0; i < n; i++) {
-      if (!constrained[i]) map.push(i);
-    }
-    
-    const nFree = map.length;
-    if (nFree === 0) return Array(n).fill(0);
-
-    const K_red: number[][] = Array(nFree).fill(0).map(() => Array(nFree).fill(0));
-    const F_red: number[] = Array(nFree).fill(0);
-
-    for (let i = 0; i < nFree; i++) {
-      F_red[i] = F[map[i]];
-      for (let j = 0; j < nFree; j++) {
-        K_red[i][j] = K[map[i]][map[j]];
-      }
-    }
-
-    for (let k = 0; k < nFree - 1; k++) {
-      for (let i = k + 1; i < nFree; i++) {
-        const factor = K_red[i][k] / K_red[k][k];
-        for (let j = k; j < nFree; j++) {
-          K_red[i][j] -= factor * K_red[k][j];
-        }
-        F_red[i] -= factor * F_red[k];
-      }
-    }
-
-    const U_red: number[] = Array(nFree).fill(0);
-    for (let i = nFree - 1; i >= 0; i--) {
-      let sum = 0;
-      for (let j = i + 1; j < nFree; j++) {
-        sum += K_red[i][j] * U_red[j];
-      }
-      U_red[i] = (F_red[i] - sum) / K_red[i][i];
-    }
-
-    const U_Full: number[] = Array(n).fill(0);
-    for (let i = 0; i < nFree; i++) {
-      U_Full[map[i]] = U_red[i];
-    }
-    return U_Full;
-  }
-
-  public runAnalysis(): AnalysisResults {
-    // Convert E from MPa to Pascals for the solver
-    const E_Pa = this.config.E * 1e6;
-    const { I, nElemsPerSpan, truckIncrement, loadCase } = this.config;
-    
-    const numSpans = this.spans.length;
-    const nTotalElems = numSpans * nElemsPerSpan;
-    const nNodes = nTotalElems + 1;
-    const nDOF = nNodes * 2;
-
-    const elemLens: number[] = [];
-    const xNodes: number[] = [0];
-    let currentX = 0;
-    const xShear: number[] = [];
-
-    for (const span of this.spans) {
-      const le = span.length / nElemsPerSpan;
-      for (let i = 0; i < nElemsPerSpan; i++) {
-        xShear.push(currentX);
-        currentX += le;
-        xShear.push(currentX);
-        xNodes.push(currentX);
-        elemLens.push(le);
-      }
-    }
-
-    const K_Global: number[][] = Array(nDOF).fill(0).map(() => Array(nDOF).fill(0));
-    for (let i = 0; i < nTotalElems; i++) {
-      const le = elemLens[i];
-      const coeff = (E_Pa * I) / Math.pow(le, 3);
-      const k_loc = [
-        [12, 6*le, -12, 6*le],
-        [6*le, 4*le*le, -6*le, 2*le*le],
-        [-12, -6*le, 12, -6*le],
-        [6*le, 2*le*le, -6*le, 4*le*le]
-      ];
-      const mapDOFs = [i*2, i*2+1, (i+1)*2, (i+1)*2+1];
-      for (let r = 0; r < 4; r++) {
-        for (let c = 0; c < 4; c++) {
-          K_Global[mapDOFs[r]][mapDOFs[c]] += k_loc[r][c] * coeff;
-        }
-      }
-    }
-
-    const constrained: boolean[] = Array(nDOF).fill(false);
-    let nodeIdx = 0;
-    constrained[0] = true;
-    for (let i = 0; i < numSpans; i++) {
-      nodeIdx += nElemsPerSpan;
-      constrained[nodeIdx * 2] = true;
-    }
-
-    const initEnvelope = (len: number) => Array(len).fill(0).map(() => ({ max: -Infinity, min: Infinity }));
-    const shearEnv = initEnvelope(nTotalElems * 2).map((p, i) => ({ ...p, x: xShear[i] }));
-    const momEnv = initEnvelope(nNodes).map((p, i) => ({ ...p, x: xNodes[i] }));
-    const defEnv = initEnvelope(nNodes).map((p, i) => ({ ...p, x: xNodes[i] }));
-
-    let activeAxles = [...this.axles];
-    let w_udl = 0;
-    if (loadCase === 'lane') {
-      w_udl = 9;
-      activeAxles = activeAxles.map(a => ({ ...a, load: a.load * 0.8 }));
-    } else {
-      activeAxles = activeAxles.map(a => ({ ...a, load: a.load * 1.25 }));
-    }
-
-    const udlEnv = {
-        vMax: Array(xShear.length).fill(0),
-        vMin: Array(xShear.length).fill(0),
-        mMax: Array(nNodes).fill(0),
-        mMin: Array(nNodes).fill(0),
-        dMax: Array(nNodes).fill(0),
-        dMin: Array(nNodes).fill(0)
-    };
-    if (w_udl > 0) this.solveUDLPatterns(w_udl, nTotalElems, nNodes, elemLens, constrained, K_Global, udlEnv, E_Pa, I);
-
-    const totalLen = xNodes[xNodes.length - 1];
-    const truckLen = activeAxles.reduce((acc, a) => acc + a.spacing, 0);
-    const startPos = -truckLen;
-    const endPos = totalLen + truckLen;
-
-    const runPass = (axles: Axle[]) => {
-      for (let pos = startPos; pos <= endPos; pos += truckIncrement) {
-        const F = Array(nDOF).fill(0);
-        let axPos = pos;
-        this.applyPointLoad(F, axPos, axles[0].load, elemLens, xNodes);
-        for (let k = 0; k < axles.length - 1; k++) {
-          axPos -= axles[k].spacing;
-          this.applyPointLoad(F, axPos, axles[k + 1].load, elemLens, xNodes);
-        }
-        const U = this.solveSystem(K_Global, F, constrained);
-        const { v, m, d } = this.calculateForces(U, nTotalElems, elemLens, E_Pa, I);
-        for (let i = 0; i < v.length; i++) {
-          const valMax = v[i] + udlEnv.vMax[i];
-          const valMin = v[i] + udlEnv.vMin[i];
-          if (valMax > shearEnv[i].max) shearEnv[i].max = valMax;
-          if (valMin < shearEnv[i].min) shearEnv[i].min = valMin;
-        }
-        for (let i = 0; i < m.length; i++) {
-          const valMMax = m[i] + udlEnv.mMax[i];
-          const valMMin = m[i] + udlEnv.mMin[i];
-          if (valMMax > momEnv[i].max) momEnv[i].max = valMMax;
-          if (valMMin < momEnv[i].min) momEnv[i].min = valMMin;
-          const valDMax = d[i] + udlEnv.dMax[i];
-          const valDMin = d[i] + udlEnv.dMin[i];
-          if (valDMax > defEnv[i].max) defEnv[i].max = valDMax;
-          if (valDMin < defEnv[i].min) defEnv[i].min = valDMin;
-        }
-      }
-    };
-
-    runPass(activeAxles);
-    const vbaRevAxles = activeAxles.map((_, i) => activeAxles[activeAxles.length - 1 - i]);
-    for(let i=0; i<vbaRevAxles.length - 1; i++) vbaRevAxles[i].spacing = activeAxles[activeAxles.length - 2 - i].spacing;
-    vbaRevAxles[vbaRevAxles.length-1].spacing = 0;
-    runPass(vbaRevAxles);
-
-    return { shear: shearEnv, moment: momEnv, deflection: defEnv, xNodes };
-  }
-
-  private solveUDLPatterns(w_udl: number, nTotalElems: number, nNodes: number, elemLens: number[], constrained: boolean[], K_Global: number[][], results: any, E_Pa: number, I: number) {
-    const nPatterns = 1 << this.spans.length;
-    const { nElemsPerSpan } = this.config;
-    results.vMax.fill(-Infinity); results.vMin.fill(Infinity);
-    results.mMax.fill(-Infinity); results.mMin.fill(Infinity);
-    results.dMax.fill(-Infinity); results.dMin.fill(Infinity);
-
-    for (let p = 0; p < nPatterns; p++) {
-        const F_UDL = Array(constrained.length).fill(0);
-        let elemCounter = 0;
-        for (let s = 0; s < this.spans.length; s++) {
-            const isLoaded = (p >> s) & 1;
-            const le = this.spans[s].length / nElemsPerSpan;
-            if (isLoaded) {
-                 const Fy = -w_udl * le / 2 * 1000;
-                 const Mom = -w_udl * le * le / 12 * 1000;
-                 for(let e=0; e<nElemsPerSpan; e++) {
-                   F_UDL[elemCounter * 2] += Fy;
-                   F_UDL[elemCounter * 2 + 1] += Mom;
-                   F_UDL[(elemCounter + 1) * 2] += Fy;
-                   F_UDL[(elemCounter + 1) * 2 + 1] -= Mom;
-                   elemCounter++;
-                 }
-            } else elemCounter += nElemsPerSpan;
-        }
-        const U_UDL = this.solveSystem(K_Global, F_UDL, constrained);
-        const { v, m, d } = this.calculateForces(U_UDL, nTotalElems, elemLens, E_Pa, I);
-        for(let i=0; i<v.length; i++) {
-            results.vMax[i] = Math.max(results.vMax[i], v[i]);
-            results.vMin[i] = Math.min(results.vMin[i], v[i]);
-        }
-        for(let i=0; i<m.length; i++) {
-            results.mMax[i] = Math.max(results.mMax[i], m[i]);
-            results.mMin[i] = Math.min(results.mMin[i], m[i]);
-            results.dMax[i] = Math.max(results.dMax[i], d[i]);
-            results.dMin[i] = Math.min(results.dMin[i], d[i]);
-        }
-    }
-  }
-
-  private applyPointLoad(F: number[], pos: number, mag: number, elemLens: number[], xNodes: number[]) {
-    if (pos < 0 || pos > xNodes[xNodes.length - 1]) return;
-    let elemIdx = -1;
-    for(let i=0; i<elemLens.length; i++) {
-        if (pos <= xNodes[i+1] + 0.000001) {
-            elemIdx = i; break;
-        }
-    }
-    if (elemIdx === -1) elemIdx = elemLens.length - 1;
-    const le = elemLens[elemIdx];
-    const localX = pos - xNodes[elemIdx];
-    const xi = localX / le;
-    const N1 = 1 - 3*xi*xi + 2*xi*xi*xi;
-    const N2 = le * (xi - 2*xi*xi + xi*xi*xi);
-    const N3 = 3*xi*xi - 2*xi*xi*xi;
-    const N4 = le * (-(xi*xi) + xi*xi*xi);
-    F[elemIdx * 2] -= mag * N1 * 1000;
-    F[elemIdx * 2 + 1] -= mag * N2 * 1000;
-    F[(elemIdx + 1) * 2] -= mag * N3 * 1000;
-    F[(elemIdx + 1) * 2 + 1] -= mag * N4 * 1000;
-  }
-
-  private calculateForces(U: number[], nElems: number, elemLens: number[], E_Pa: number, I: number) {
-    const v: number[] = [];
-    const m: number[] = Array(nElems + 1).fill(0);
-    const d: number[] = Array(nElems + 1).fill(0);
-    const elemForces = [];
-    for (let e = 0; e < nElems; e++) {
-      const le = elemLens[e];
-      const coeff = (E_Pa * I) / Math.pow(le, 3);
-      const u_loc = [U[e*2], U[e*2+1], U[(e+1)*2], U[(e+1)*2+1]];
-      const k_loc = [
-        [12, 6*le, -12, 6*le],
-        [6*le, 4*le*le, -6*le, 2*le*le],
-        [-12, -6*le, 12, -6*le],
-        [6*le, 2*le*le, -6*le, 4*le*le]
-      ];
-      const f_loc = [0,0,0,0];
-      for(let r=0; r<4; r++) for(let c=0; c<4; c++) f_loc[r] += k_loc[r][c] * coeff * u_loc[c];
-      elemForces.push(f_loc);
-      v.push(f_loc[0] / 1000); v.push(-f_loc[2] / 1000);
-    }
-    for(let n=0; n <= nElems; n++) {
-      d[n] = U[n*2];
-      let valM = 0;
-      if (n === 0) valM = elemForces[0][1];
-      else if (n === nElems) valM = -elemForces[nElems-1][3];
-      else valM = (-elemForces[n-1][3] + elemForces[n][1]) / 2;
-      m[n] = -valM / 1000;
-    }
-    return { v, m, d };
-  }
-}
+// --- FEM ENGINE (ll-analyzer: src/lib/beam-engine.ts) ---
+// Local BeamFEM replaced by analyzeBeam() from @/lib/beam-engine.ts
+// (banded LDL^T, influence-line UDL zones, continuous truck optimisation,
+// selected-axle DLA, envelope mode). See src/lib/beam-engine.ts.
 
 // --- COMPONENTS ---
 
@@ -361,12 +100,18 @@ const EnvelopeChart = ({ data, dataKeyMax, dataKeyMin, title, unit, color }: any
   const [width, setWidth] = useState(600);
   const height = 300;
   const padding = { top: 40, right: 30, bottom: 50, left: 70 };
+  const [hoverData, setHoverData] = useState<{ x: number; svgX: number; max: number; min: number } | null>(null);
 
   useEffect(() => {
-    if(containerRef.current) setWidth(containerRef.current.clientWidth);
-    const handleResize = () => containerRef.current && setWidth(containerRef.current.clientWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const container = containerRef.current;
+    if (!container) return;
+    setWidth(container.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      const measured = entries[0].contentRect.width;
+      if (measured > 0) setWidth(measured);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
   if (!data || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-slate-600">No Data</div>;
@@ -380,6 +125,17 @@ const EnvelopeChart = ({ data, dataKeyMax, dataKeyMin, title, unit, color }: any
   const yRange = yMax - yMin;
   if (yRange === 0) { yMax += 1; yMin -= 1; }
   else { yMax += yRange * 0.1; yMin -= yRange * 0.1; }
+
+  let globalMaxVal = -Infinity;
+  let globalMaxX = xMin;
+  let globalMinVal = Infinity;
+  let globalMinX = xMin;
+  for (let i = 0; i < data.length; i++) {
+    const curMax = data[i][dataKeyMax];
+    const curMin = data[i][dataKeyMin];
+    if (curMax > globalMaxVal) { globalMaxVal = curMax; globalMaxX = data[i].x; }
+    if (curMin < globalMinVal) { globalMinVal = curMin; globalMinX = data[i].x; }
+  }
   
   const xTicks = calculateTicks(xMin, xMax, 8);
   const yTicks = calculateTicks(yMin, yMax, 6);
@@ -392,11 +148,89 @@ const EnvelopeChart = ({ data, dataKeyMax, dataKeyMin, title, unit, color }: any
                    minVals.slice().reverse().map((y: number, i: number) => `L ${xScale(data[data.length-1-i].x)} ${yScale(y)}`).join(' ') + " Z";
 
   const zeroY = yScale(0);
+  const unitSymbol = unit.includes('(') ? unit.split('(')[1].replace(')', '') : unit;
+  const formatVal = (val: number) => {
+    if (!Number.isFinite(val)) return '0.00';
+    if (Math.abs(val) < 1e-6) return '0.00';
+    if (Math.abs(val) < 0.005) return val.toFixed(4);
+    return val.toFixed(2);
+  };
+  const formatValWithDetail = (val: number) => {
+    if (!Number.isFinite(val)) return '0.00 ' + unitSymbol;
+    if (unitSymbol.toLowerCase() === 'm') {
+      const mm = (val * 1000).toFixed(2);
+      return `${val.toFixed(4)} m (${mm} mm)`;
+    }
+    return `${formatVal(val)} ${unitSymbol}`;
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svgRect = e.currentTarget.getBoundingClientRect();
+    if (svgRect.width <= 0) return;
+    const clientX = e.clientX - svgRect.left;
+    const plotWidth = width - padding.left - padding.right;
+    if (plotWidth <= 0) return;
+    const rawRatio = (clientX - padding.left) / plotWidth;
+    const clampedRatio = Math.max(0, Math.min(1, rawRatio));
+    const targetX = xMin + clampedRatio * (xMax - xMin);
+    let bestMax = 0;
+    let bestMin = 0;
+    let found = false;
+    for (let i = 0; i < data.length - 1; i++) {
+      const x1 = data[i].x;
+      const x2 = data[i + 1].x;
+      if (x1 === x2) continue;
+      const minSegX = Math.min(x1, x2);
+      const maxSegX = Math.max(x1, x2);
+      if (targetX >= minSegX && targetX <= maxSegX) {
+        const t = (targetX - x1) / (x2 - x1);
+        bestMax = data[i][dataKeyMax] + t * (data[i + 1][dataKeyMax] - data[i][dataKeyMax]);
+        bestMin = data[i][dataKeyMin] + t * (data[i + 1][dataKeyMin] - data[i][dataKeyMin]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      let nearestDist = Infinity;
+      let nearestIdx = 0;
+      for (let i = 0; i < data.length; i++) {
+        const dist = Math.abs(data[i].x - targetX);
+        if (dist < nearestDist) { nearestDist = dist; nearestIdx = i; }
+      }
+      bestMax = data[nearestIdx][dataKeyMax];
+      bestMin = data[nearestIdx][dataKeyMin];
+    }
+    setHoverData({ x: targetX, svgX: xScale(targetX), max: bestMax, min: bestMin });
+  };
+  const handlePointerLeave = () => setHoverData(null);
+
+  const tooltipWidth = 205;
+  const tooltipHeight = 68;
+  const tooltipX = hoverData
+    ? hoverData.svgX > width - tooltipWidth - 20
+      ? Math.max(padding.left + 5, hoverData.svgX - tooltipWidth - 12)
+      : Math.min(width - padding.right - tooltipWidth - 5, hoverData.svgX + 12)
+    : 0;
+  const tooltipY = Math.max(padding.top + 6, Math.min(height - padding.bottom - tooltipHeight - 6, padding.top + 8));
 
   return (
     <div ref={containerRef} className="w-full bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-800 p-8 mb-8">
-      <h3 className="text-lg font-black text-white uppercase tracking-tighter mb-6">{title}</h3>
-      <svg width={width} height={height} className="overflow-visible">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <h3 className="text-lg font-black text-white uppercase tracking-tighter">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300">
+            <span className="text-slate-500">Max:</span>
+            <span className="font-mono">{formatVal(globalMaxVal)} {unitSymbol}</span>
+            <span className="text-slate-500">@ {globalMaxX.toFixed(2)}m</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300">
+            <span className="text-slate-500">Min:</span>
+            <span className="font-mono">{formatVal(globalMinVal)} {unitSymbol}</span>
+            <span className="text-slate-500">@ {globalMinX.toFixed(2)}m</span>
+          </div>
+        </div>
+      </div>
+      <svg width={width} height={height} className="overflow-visible select-none" onPointerMove={handlePointerMove} onPointerLeave={handlePointerLeave}>
         {xTicks.map(tick => (
           <g key={`x-${tick}`}>
             <line x1={xScale(tick)} y1={padding.top} x2={xScale(tick)} y2={height - padding.bottom} stroke="currentColor" className="text-slate-800" strokeWidth="1" />
@@ -419,6 +253,28 @@ const EnvelopeChart = ({ data, dataKeyMax, dataKeyMin, title, unit, color }: any
         <path d={pathFill} fill={color} fillOpacity="0.15" />
         <path d={pathMax} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
         <path d={pathMin} fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+        {Number.isFinite(globalMaxVal) && (
+          <circle cx={xScale(globalMaxX)} cy={yScale(globalMaxVal)} r="4.5" fill={color} stroke="#0f172a" strokeWidth="1.5">
+            <title>{`Max: ${formatVal(globalMaxVal)} ${unitSymbol} at x = ${globalMaxX.toFixed(2)} m`}</title>
+          </circle>
+        )}
+        {Number.isFinite(globalMinVal) && (
+          <circle cx={xScale(globalMinX)} cy={yScale(globalMinVal)} r="4.5" fill="#ef4444" stroke="#0f172a" strokeWidth="1.5">
+            <title>{`Min: ${formatVal(globalMinVal)} ${unitSymbol} at x = ${globalMinX.toFixed(2)} m`}</title>
+          </circle>
+        )}
+        {hoverData && (
+          <g pointerEvents="none">
+            <line x1={hoverData.svgX} y1={padding.top} x2={hoverData.svgX} y2={height - padding.bottom} stroke="#475569" strokeWidth="1.2" strokeDasharray="3 3" />
+            <circle cx={hoverData.svgX} cy={yScale(hoverData.max)} r="4.5" fill={color} stroke="#ffffff" strokeWidth="2" />
+            <circle cx={hoverData.svgX} cy={yScale(hoverData.min)} r="4.5" fill="#ef4444" stroke="#ffffff" strokeWidth="2" />
+            <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height={tooltipHeight} rx="6" fill="#0f172a" opacity="0.94" />
+            <text x={tooltipX + 10} y={tooltipY + 18} fill="#f8fafc" fontSize="11" fontWeight="700">x = {hoverData.x.toFixed(2)} m</text>
+            <text x={tooltipX + 10} y={tooltipY + 36} fill="#60a5fa" fontSize="10" fontWeight="500">Max: {formatValWithDetail(hoverData.max)}</text>
+            <text x={tooltipX + 10} y={tooltipY + 54} fill="#f87171" fontSize="10" fontWeight="500">Min: {formatValWithDetail(hoverData.min)}</text>
+          </g>
+        )}
+        <rect x={padding.left} y={padding.top} width={width - padding.left - padding.right} height={height - padding.top - padding.bottom} fill="transparent" className="cursor-crosshair" />
       </svg>
       <div className="flex justify-center gap-8 mt-6 text-[10px] font-black uppercase tracking-widest">
         <div className="flex items-center gap-2 text-sky-400"><div className="w-4 h-1 rounded-full" style={{backgroundColor: color}}></div> Max Envelope</div>
@@ -448,12 +304,47 @@ export function LiveLoadAnalysis() {
   const removeSpan = (id: string) => spans.length > 1 && setSpans(spans.filter(s => s.id !== id));
   const updateSpan = (id: string, val: number) => setSpans(spans.map(s => s.id === id ? { ...s, length: val } : s));
 
+  const addAxle = () => {
+    if (axles.length >= MAX_AXLES) return;
+    setAxles([
+      ...axles.map((a, i) => (i === axles.length - 1 ? { ...a, spacing: 3.6 } : a)),
+      { id: `a${Date.now()}`, load: 100, spacing: 0 },
+    ]);
+  };
+  const removeAxle = (id: string) => axles.length > 1 && setAxles(axles.filter((a) => a.id !== id));
+  const updateAxle = (id: string, patch: Partial<Axle>) =>
+    setAxles(axles.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  const resetAxles = () => setAxles(DEFAULT_AXLES);
+
+  const stepInfo = useMemo(
+    () => computeEffectiveIncrement(spans, axles, config.truckIncrement, config.nElemsPerSpan),
+    [spans, axles, config.truckIncrement, config.nElemsPerSpan]
+  );
+
   const runAnalysis = async () => {
     setIsAnalyzing(true);
     setTimeout(() => {
       try {
-        const solver = new BeamFEM(spans, axles, config);
-        setResults(solver.runAnalysis());
+        const result = analyzeBeam({
+          spans,
+          axles,
+          config: {
+            E: config.E * 1e6,
+            I: config.I,
+            nElemsPerSpan: config.nElemsPerSpan,
+            truckIncrement: config.truckIncrement,
+            loadCase: config.loadCase,
+            dlaOverride: config.dlaOverride ?? null,
+            dlaMultiplier: config.dlaMultiplier ?? 1,
+            laneUdl: config.laneUdl ?? 9,
+          },
+        });
+        setResults({
+          shear: result.shear,
+          moment: result.moment,
+          deflection: result.deflection,
+          xNodes: result.xNodes,
+        });
         setActiveTab('results');
       } catch (e) { console.error(e); }
       setIsAnalyzing(false);
@@ -533,12 +424,95 @@ export function LiveLoadAnalysis() {
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Load Case Configuration</label>
                   <select 
                     value={config.loadCase} 
-                    onChange={(e) => setConfig({ ...config, loadCase: e.target.value as 'truck' | 'lane' })} 
+                    onChange={(e) => setConfig({ ...config, loadCase: e.target.value as 'truck' | 'lane' | 'envelope' })} 
                     className="w-full bg-slate-950 border-2 border-slate-800 rounded-2xl px-4 py-4 text-xs font-bold text-white focus:border-sky-500 outline-none transition-all shadow-inner appearance-none cursor-pointer"
                   >
-                    <option value="truck">CL-625 Truck Only (Impact DLA Included)</option>
-                    <option value="lane">CL-625 Lane Load (80% Truck + 9 kN/m UDL)</option>
+                    <option value="truck">CL-625 Truck Only (Auto DLA 40%/30%/25%)</option>
+                    <option value="lane">{`CL-625 Lane Load (80% Truck + ${config.laneUdl ?? 9} kN/m UDL)`}</option>
+                    <option value="envelope">Envelope (max of Truck and Lane)</option>
                   </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Lane UDL (kN/m)</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={config.laneUdl ?? ''}
+                      placeholder="9 (default)"
+                      onChange={(e) => setConfig({ ...config, laneUdl: e.target.value === '' ? null : e.target.valueAsNumber })}
+                      className="w-1/3 bg-slate-950 border-2 border-slate-800 rounded-2xl p-4 text-xs font-bold text-white focus:border-sky-500 outline-none shadow-inner"
+                    />
+                    <span className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-wide">
+                      Blank = 9 kN/m (CL-625). Zero removes only the UDL; the 80% lane truck remains. Lane + Envelope.
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Dynamic Load Allowance (DLA)</label>
+                    <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={config.dlaOverride !== null && config.dlaOverride !== undefined}
+                        onChange={(e) => setConfig({ ...config, dlaOverride: e.target.checked ? (config.dlaOverride ?? 0.25) : null })}
+                        className="rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-sky-500 h-3.5 w-3.5 cursor-pointer"
+                      />
+                      Override DLA
+                    </label>
+                  </div>
+                  {config.dlaOverride === null || config.dlaOverride === undefined ? (
+                    <div className="bg-sky-950/20 border border-sky-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">
+                        Auto: 40%/30%/25% × d={(config.dlaMultiplier ?? 1).toFixed(2)}
+                      </span>
+                      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">CSA S6 Cl. 3.8.4.5</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={config.dlaOverride}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setConfig({ ...config, dlaOverride: isNaN(val) ? 0 : val });
+                        }}
+                        placeholder="e.g. 0.30"
+                        className="w-1/3 bg-slate-950 border-2 border-amber-500/40 rounded-2xl p-4 text-xs font-bold text-white focus:border-amber-400 outline-none shadow-inner"
+                      />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                        Manual: {((config.dlaOverride ?? 0) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[9px] font-bold text-slate-600 leading-relaxed uppercase tracking-wide mt-2">
+                    Auto per placement: 40% (1 axle), 30% (2 axles / front-three), 25% (≥3 axles), × d. Lane gets no DLA.
+                  </p>
+                  <div className="mt-3">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Truck DLA Multiplier, d (0–1)</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={config.dlaMultiplier ?? 1}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setConfig({ ...config, dlaMultiplier: isNaN(val) ? 1 : Math.max(0, Math.min(1, val)) });
+                        }}
+                        placeholder="e.g. 1.00"
+                        className="w-1/3 bg-slate-950 border-2 border-slate-800 rounded-2xl p-4 text-xs font-bold text-white focus:border-sky-500 outline-none shadow-inner"
+                      />
+                      <span className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-wide">
+                        d=0 off, d=1 full. Applies to truck DLA (auto or override).
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                    <div className="space-y-2">
@@ -550,22 +524,61 @@ export function LiveLoadAnalysis() {
                     <input type="number" value={config.I} onChange={(e) => setConfig({ ...config, I: parseFloat(e.target.value) })} className="w-full bg-slate-950 border-2 border-slate-800 rounded-2xl p-4 text-xs font-bold text-white focus:border-sky-500 outline-none shadow-inner" />
                    </div>
                 </div>
+                <div className="grid grid-cols-2 gap-6">
+                   <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block px-1">Elements / Span</label>
+                    <input type="number" min="2" max="200" step="1" value={config.nElemsPerSpan} onChange={(e) => setConfig({ ...config, nElemsPerSpan: Number(e.target.value) })} className="w-full bg-slate-950 border-2 border-slate-800 rounded-2xl p-4 text-xs font-bold text-white focus:border-sky-500 outline-none shadow-inner" />
+                   </div>
+                   <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block px-1">Truck Step, Base (m)</label>
+                    <input type="number" min="0.02" max="2" step="0.05" value={config.truckIncrement} onChange={(e) => setConfig({ ...config, truckIncrement: Number(e.target.value) })} className="w-full bg-slate-950 border-2 border-slate-800 rounded-2xl p-4 text-xs font-bold text-white focus:border-sky-500 outline-none shadow-inner" />
+                   </div>
+                </div>
                 <div className="bg-sky-950/20 border border-sky-500/20 p-5 rounded-2xl flex gap-4">
                   <AlertCircle className="w-5 h-5 text-sky-500 shrink-0" />
                   <p className="text-[10px] font-bold text-sky-400/80 leading-relaxed uppercase tracking-wide">
-                    Mesh Refinement: {config.nElemsPerSpan} elements/span. Truck Movement Increment: {config.truckIncrement}m. Numerical accuracy depends on element density.
+                    Mesh: {config.nElemsPerSpan} elements/span. Sweep uses {stepInfo.effective.toFixed(3)}m{stepInfo.wasAdjusted ? ` (adjusted from ${config.truckIncrement}m — ${stepInfo.reason})` : ` (base ${config.truckIncrement}m)`}. Exact support alignments included.
                   </p>
                 </div>
               </div>
             </div>
              <div className="bg-slate-900 border border-slate-800 p-10 rounded-[2.5rem] shadow-2xl">
-               <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-800 pb-4 mb-6">Standard Axle Profile (kN)</h3>
-               <div className="flex flex-wrap gap-3">
+               <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Truck Configuration (kN / m)</h3>
+                 <div className="flex gap-2">
+                   <button onClick={addAxle} disabled={axles.length >= MAX_AXLES} className="text-[9px] font-black uppercase bg-slate-800 text-sky-400 px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors flex items-center gap-2 border border-sky-500/20 disabled:opacity-30 disabled:cursor-not-allowed"><Plus className="w-3 h-3" /> Add Axle</button>
+                   <button onClick={resetAxles} className="text-[9px] font-black uppercase bg-slate-800 text-slate-400 px-4 py-2 rounded-xl hover:bg-slate-700 transition-colors border border-slate-700">Reset CL-625</button>
+                 </div>
+               </div>
+               <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wide mb-4">CL-625 defaults; customize up to {MAX_AXLES} axles. Spacing is to the next axle.</p>
+               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
                  {axles.map((axle, i) => (
-                   <div key={axle.id} className="flex-1 bg-slate-950/50 border border-slate-800 rounded-2xl p-4 text-center shadow-inner group hover:border-sky-500/30 transition-all">
-                     <div className="text-[8px] font-black text-slate-600 uppercase mb-1">Axle {i+1}</div>
-                     <div className="font-mono text-lg text-sky-400 font-black tracking-tighter">{axle.load}</div>
-                     {i < axles.length - 1 && <div className="text-[8px] font-black text-slate-700 mt-2 border-t border-slate-800 pt-2 group-hover:text-slate-500 transition-colors">↓ {axle.spacing}m</div>}
+                   <div key={axle.id} className="flex items-end gap-3 p-4 bg-slate-950/50 rounded-2xl border-2 border-slate-800/80 shadow-inner">
+                     <span className="text-[10px] font-black text-slate-600 w-8 pb-2">#{i + 1}</span>
+                     <div className="flex-1">
+                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Load (kN)</label>
+                       <input
+                         type="number"
+                         min="0"
+                         value={axle.load}
+                         onChange={(e) => updateAxle(axle.id, { load: Number(e.target.value) })}
+                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-bold text-white focus:border-sky-500 outline-none transition-all shadow-inner"
+                       />
+                     </div>
+                     {i < axles.length - 1 && (
+                       <div className="flex-1">
+                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Spacing ↓ (m)</label>
+                         <input
+                           type="number"
+                           min="0"
+                           step="0.1"
+                           value={axle.spacing}
+                           onChange={(e) => updateAxle(axle.id, { spacing: Number(e.target.value) })}
+                           className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-bold text-white focus:border-sky-500 outline-none transition-all shadow-inner"
+                         />
+                       </div>
+                     )}
+                     <button aria-label={`Remove axle ${i + 1}`} disabled={axles.length <= 1} onClick={() => removeAxle(axle.id)} className="text-slate-700 hover:text-red-500 p-2 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
                    </div>
                  ))}
                </div>
